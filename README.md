@@ -3,9 +3,14 @@
 Location Routing Problem (LRP) solver, ported from a CVRP genetic algorithm that
 solves a giant tour with a route-first/cluster-second split.
 
-**State:** only the instance reader is in place. The metaheuristic
-(`Algorithm.Metaheuristics.GeneticAlgorithm`) and the solution classes are not
-ported yet, so the calls to them in `Algorithm/main.java` are commented out.
+Each route is served from a `Depot`, the split builds one candidate route per
+candidate depot, and a `Solution` groups its routes by depot.
+
+**State:** the reader, the split, the local search and the memetic algorithm all
+run on LRP instances. The objective is still the travelled distance alone: depot
+opening costs and the route opening cost are parsed and exposed, yet not added to
+the solution cost, so results are not comparable to the published best known
+values. Depot capacities are not enforced either.
 
 ## Build
 
@@ -19,12 +24,17 @@ Classes land in `out/`.
 ## Run
 
 ```bash
-java -cp out main                      # loads the instance hardcoded in Algorithm/main.java
-java -cp out Algorithm.Data.InputData  # reader self-check
+java -cp out main                      # solves the instance hardcoded in Algorithm/main.java
+java -cp out benchmark                 # solves a whole benchmark directory
+java -cp out Algorithm.Data.InputData        # reader self-check
+java -cp out Algorithm.Solution.SplitCheck   # split self-check
+java -cp out Algorithm.Solution.LSM.GainCheck # local search self-check
 ```
 
-`main` prints what the reader parsed: sizes, the depots, total demand, and a few
-distances. Change the instance by editing the path in `Algorithm/main.java`.
+Change the instance (or the benchmark directory) by editing the path at the top
+of `Algorithm/main.java` or `Algorithm/benchmark.java`. `benchmark` writes
+`results <dir>.csv` with one row per instance and the gap to the best known cost
+read from `bks.csv`; instances missing from that file report `NA`.
 
 ## Instances
 

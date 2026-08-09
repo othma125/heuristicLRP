@@ -86,7 +86,7 @@ public class InputData {
             this.Demands[c] = (int) Double.parseDouble(token[t++]);
         this.Depots = new Depot[this.DepotNumber];
         for (int d = 0; d < this.DepotNumber; d++)
-            this.Depots[d] = new Depot(locations[d], depotCapacities[d],
+            this.Depots[d] = new Depot(d, locations[d], depotCapacities[d],
                                        Double.parseDouble(token[t++]));
         this.RouteCost = Double.parseDouble(token[t++]);
         this.RealCosts = Double.parseDouble(token[t++]) == 1;
@@ -120,29 +120,20 @@ public class InputData {
 
     /**
      * @param stop  0-based customer index
-     * @param depot 0-based depot index
+     * @param depot the depot the route returns to
      * @return the distance from the customer back to the depot
      */
-    public double getStopToDepotDistance(int stop, int depot) {
-        return this.Distances[this.DepotNumber + stop][depot];
+    public double getStopToDepotDistance(int stop, Depot depot) {
+        return this.Distances[this.DepotNumber + stop][depot.index()];
     }
 
     /**
-     * @param depot 0-based depot index
+     * @param depot the depot the route leaves from
      * @param stop  0-based customer index
      * @return the distance from the depot out to the customer
      */
-    public double getDepotToStopDistance(int depot, int stop) {
-        return this.Distances[depot][this.DepotNumber + stop];
-    }
-
-    /**
-     * @param depot1 first 0-based depot index
-     * @param depot2 second 0-based depot index
-     * @return the distance between the two depots
-     */
-    public double getTwoDepotsDistance(int depot1, int depot2) {
-        return this.Distances[depot1][depot2];
+    public double getDepotToStopDistance(Depot depot, int stop) {
+        return this.Distances[depot.index()][this.DepotNumber + stop];
     }
 
     /* ======================
@@ -163,6 +154,13 @@ public class InputData {
     }
 
     /**
+     * @return the number of nodes in the instance, depots plus customers
+     */
+    public int getSize() {
+        return this.DepotNumber + this.CustomerNumber;
+    }
+
+    /**
      * @return the vehicle capacity
      */
     public int getCapacity() {
@@ -178,11 +176,11 @@ public class InputData {
     }
 
     /**
-     * @param depot 0-based depot index
-     * @return the depot, with its coordinates, capacity and opening cost
+     * @return the candidate depots, with their coordinates, capacities and
+     *         opening costs (the backing array, not a copy)
      */
-    public Depot getDepot(int depot) {
-        return this.Depots[depot];
+    public Depot[] getDepots() {
+        return this.Depots;
     }
 
     /**
@@ -217,16 +215,16 @@ public class InputData {
     // `java -cp out Algorithm.Data.InputData` from the project root.
     public static void main(String[] args) throws IOException {
         InputData data = new InputData("Algorithm/LRPLib/Instances_Prodhon_LRP/coord20-5-1.dat");
+        Depot[] depots = data.getDepots();
         double depot0ToStop0 = Math.floor(Math.hypot(20 - 6, 35 - 7) * 100); // 3130
         if (data.getCustomerNumber() != 20 || data.getDepotNumber() != 5
-                || data.getCapacity() != 70 || data.getDepot(4).capacity() != 140
+                || data.getCapacity() != 70 || depots[4].capacity() != 140
                 || data.getDemand(0) != 17 || data.getDemand(19) != 16
-                || data.getDepot(0).openingCost() != 10841
-                || data.getDepot(4).openingCost() != 7497
-                || !data.getDepot(0).location().equals(new Location(6, 7))
+                || depots[0].openingCost() != 10841 || depots[4].openingCost() != 7497
+                || !depots[0].location().equals(new Location(6, 7))
                 || data.getRouteCost() != 1000 || data.hasRealCosts()
-                || data.getDepotToStopDistance(0, 0) != depot0ToStop0
-                || data.getStopToDepotDistance(0, 0) != depot0ToStop0)
+                || data.getDepotToStopDistance(depots[0], 0) != depot0ToStop0
+                || data.getStopToDepotDistance(0, depots[0]) != depot0ToStop0)
             throw new AssertionError("LRP parsing is broken: " + data);
         System.out.println("ok " + data);
     }
