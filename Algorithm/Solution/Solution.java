@@ -47,45 +47,34 @@ public final class Solution implements Comparable<Solution>, AutoCloseable {
      *
      * @param data the problem instance providing distances and capacity
      */
-    // void InterRoutesLocalSearch(InputData data) {
-    //     // this.Routes.forEach(r -> {
-    //     //     double old_distance = r.getTraveledDistance();
-    //     //     r.IntraRoutesLocalSearch(data);
-    //     //     this.TotalDistance += r.getTraveledDistance() - old_distance;
-    //     // });
-    //     // Restarting the scan after each accepted move used to recurse, which overflows the
-    //     // stack now that moves across depots keep the improving chain going much longer.
-    //     boolean improved = true;
-    //     while (improved) {
-    //         improved = false;
-    //         List<Route> routes = this.getRoutes();
-    //         for (Route r1 : routes) {
-    //             for (Route r2 : routes)
-    //                 if (r1 != r2 && r1.getDepot() == r2.getDepot()) {
-    //                     LocalSearchMove lsm = r1.getLSM(data, r2);
-    //                     if (lsm != null) {
-    //                         lsm.Perform(data);
-    //                         this.remove(r1);
-    //                         this.TotalDistance -= r1.getTraveledDistance();
-    //                         this.remove(r2);
-    //                         this.TotalDistance -= r2.getTraveledDistance();
-    //                         if (lsm.getFirstRoute() != null) {
-    //                             this.add(lsm.getFirstRoute());
-    //                             this.TotalDistance += lsm.getFirstRoute().getTraveledDistance();
-    //                         }
-    //                         if (lsm.getSecondRoute() != null) {
-    //                             this.add(lsm.getSecondRoute());
-    //                             this.TotalDistance += lsm.getSecondRoute().getTraveledDistance();
-    //                         }
-    //                         improved = true;
-    //                         break;
-    //                     }
-    //                 }
-    //             if (improved)
-    //                 break;
-    //         }
-    //     }
-    // }
+    void InterRoutesLocalSearch(InputData data) {
+        // Restarting the scan after each accepted move used to recurse, which overflows the
+        // stack now that moves across depots keep the improving chain going much longer.
+        List<Route> routes = this.getRoutes();
+        for (Route r1 : routes) {
+            for (Route r2 : routes)
+                if (r1 != r2 && r1.getDepot() == r2.getDepot()) {
+                    LocalSearchMove lsm = r1.getLSM(data, r2);
+                    if (lsm != null) {
+                        lsm.Perform(data);
+                        this.remove(r1);
+                        this.TotalDistance -= r1.getTraveledDistance();
+                        this.remove(r2);
+                        this.TotalDistance -= r2.getTraveledDistance();
+                        if (lsm.getFirstRoute() != null) {
+                            this.add(lsm.getFirstRoute());
+                            this.TotalDistance += lsm.getFirstRoute().getTraveledDistance();
+                        }
+                        if (lsm.getSecondRoute() != null) {
+                            this.add(lsm.getSecondRoute());
+                            this.TotalDistance += lsm.getSecondRoute().getTraveledDistance();
+                        }
+                        this.InterRoutesLocalSearch(data);
+                        return;
+                    }
+                }
+        }
+    }
     
     /**
      * @param stop a 0-based customer index

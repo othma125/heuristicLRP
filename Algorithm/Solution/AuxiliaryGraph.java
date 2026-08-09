@@ -63,10 +63,10 @@ public class AuxiliaryGraph implements AutoCloseable {
             AuxiliaryGraph.Pool.execute(setter);
         }
         this.phaser.arriveAndAwaitAdvance();
-        // if (this.isFeasible())
-        //     this.getLastNode().getSolutions()
-        //                         .parallelStream()
-        //                         .forEach(s -> s.InterRoutesLocalSearch(data));
+        if (this.isFeasible())
+            this.getLastNode().getSolutions()
+                                .parallelStream()
+                                .forEach(s -> s.InterRoutesLocalSearch(data));
     }
 
     /**

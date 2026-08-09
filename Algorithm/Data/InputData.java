@@ -18,7 +18,7 @@ import java.nio.file.Path;
  * numbers, so it is read positionally.
  *
  * <p>Distances are Euclidean. On integer instances (flag 0) they are multiplied
- * by 100 and truncated, as the benchmark's best known solutions assume.
+ * by 100 and rounded up, which is what reproduces the benchmark's published costs.
  *
  * <p>Depots and customers are both 0-based in the public accessors; internally
  * they share one coordinate space with the depots first, matching the file.
@@ -100,8 +100,11 @@ public class InputData {
         for (int a = 0; a < nodes; a++)
             for (int b = 0; b < a; b++) {
                 double distance = locations[a].distanceTo(locations[b]);
+                // files format.txt says the scaled distance is truncated, but the published
+                // costs only reproduce with each leg rounded up: on 20-5-2b the optimum comes
+                // out at exactly 37542 this way, and 21 below it when truncated.
                 if (!this.RealCosts)
-                    distance = Math.floor(distance * 100);
+                    distance = Math.ceil(distance * 100);
                 this.Distances[a][b] = this.Distances[b][a] = distance;
             }
     }
@@ -192,7 +195,7 @@ public class InputData {
 
     /**
      * @return {@code true} when the instance uses real costs, {@code false} when
-     *         distances are scaled by 100 and truncated to integers
+     *         distances are scaled by 100 and rounded up to integers
      */
     public boolean hasRealCosts() {
         return this.RealCosts;
@@ -216,7 +219,7 @@ public class InputData {
     public static void main(String[] args) throws IOException {
         InputData data = new InputData("Algorithm/LRPLib/Instances_Prodhon_LRP/coord20-5-1.dat");
         Depot[] depots = data.getDepots();
-        double depot0ToStop0 = Math.floor(Math.hypot(20 - 6, 35 - 7) * 100); // 3130
+        double depot0ToStop0 = Math.ceil(Math.hypot(20 - 6, 35 - 7) * 100); // 3131
         if (data.getCustomerNumber() != 20 || data.getDepotNumber() != 5
                 || data.getCapacity() != 70 || depots[4].capacity() != 140
                 || data.getDemand(0) != 17 || data.getDemand(19) != 16
