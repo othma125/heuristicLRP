@@ -26,6 +26,9 @@ import java.util.LinkedList;
 public final class Solution implements Comparable<Solution>, AutoCloseable {
 
     private final Map<Depot, List<Route>> Routes;
+    // The demand each opened depot already ships, kept in step with the routes so that
+    // checking whether a depot can take more stops stays a lookup instead of a scan.
+    private final Map<Depot, Integer> DepotLoads;
     private final Set<Integer> Stops;
     private double TotalDistance;
 
@@ -36,6 +39,7 @@ public final class Solution implements Comparable<Solution>, AutoCloseable {
     Solution(double distance, int capacity) {
         this.TotalDistance = distance;
         this.Routes = new LinkedHashMap<>(capacity, 1f);
+        this.DepotLoads = new LinkedHashMap<>(capacity, 1f);
         this.Stops = new HashSet<>();
     }
 
@@ -92,8 +96,17 @@ public final class Solution implements Comparable<Solution>, AutoCloseable {
      */
     void add(Route new_route) {
         this.Routes.computeIfAbsent(new_route.getDepot(), depot -> new LinkedList<>()).add(new_route);
+        this.DepotLoads.merge(new_route.getDepot(), new_route.getSumDemand(), Integer::sum);
         for (int stop : new_route.getSequence())
             this.Stops.add(stop);
+    }
+
+    /**
+     * @param depot a candidate depot
+     * @return the demand this solution already ships from that depot
+     */
+    int getDepotLoad(Depot depot) {
+        return this.DepotLoads.getOrDefault(depot, 0);
     }
 
     /**
@@ -104,8 +117,14 @@ public final class Solution implements Comparable<Solution>, AutoCloseable {
      */
     void remove(Route route) {
         List<Route> routes = this.Routes.get(route.getDepot());
-        if (routes != null && routes.remove(route) && routes.isEmpty())
-            this.Routes.remove(route.getDepot());
+        if (routes != null && routes.remove(route)) {
+            if (routes.isEmpty()) {
+                this.Routes.remove(route.getDepot());
+                this.DepotLoads.remove(route.getDepot());
+            }
+            else
+                this.DepotLoads.merge(route.getDepot(), -route.getSumDemand(), Integer::sum);
+        }
     }
 
     /**
@@ -230,6 +249,7 @@ public final class Solution implements Comparable<Solution>, AutoCloseable {
         for (Route route : this.getRoutes())
             route.close();
         this.Routes.clear();
+        this.DepotLoads.clear();
         this.Stops.clear();
     }
 }

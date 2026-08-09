@@ -83,8 +83,8 @@ public class ArcSetter extends RecursiveAction {
                     if (cumulative_demand <= this.graph.getData().getCapacity()
                         && this.depotLoad(depot) + cumulative_demand <= depot.capacity()
                         && !EndingNode.UpdateLabel(this.Solution, candidate)) {
-                        // candidate.IntraRoutesLocalSearch(this.graph.getData());
-                        // EndingNode.UpdateLabel(this.Solution, candidate);
+                        candidate.IntraRoutesLocalSearch(this.graph.getData());
+                        EndingNode.UpdateLabel(this.Solution, candidate);
                     }
                 }
                 boolean c = true;
@@ -95,8 +95,7 @@ public class ArcSetter extends RecursiveAction {
                         final int combined_demand = old_route.getSumDemand() + cumulative_demand;
                         // Extending a route leaves its depot serving the new stops as well, so the
                         // depot has to have room for them on top of everything it already ships.
-                        final boolean depot_has_room = this.depotLoad(old_route.getDepot()) + cumulative_demand
-                                                       <= old_route.getDepot().capacity();
+                        final boolean depot_has_room = this.depotLoad(old_route.getDepot()) + cumulative_demand <= old_route.getDepot().capacity();
                         if (combined_demand <= this.graph.getData().getCapacity() && depot_has_room) {
                             int[] combined_sequence1 = new int[old_route.getLength() + length];
                             for (int index = 0; index < combined_sequence1.length; index++) {
@@ -157,11 +156,7 @@ public class ArcSetter extends RecursiveAction {
      * @return the demand the partial solution already ships from that depot
      */
     private int depotLoad(Depot depot) {
-        int load = 0;
-        if (this.Solution != null)
-            for (Route route : this.Solution.getRoutes(depot))
-                load += route.getSumDemand();
-        return load;
+        return this.Solution == null ? 0 : this.Solution.getDepotLoad(depot);
     }
 
     @Override
