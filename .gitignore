@@ -1,0 +1,15 @@
+# Solver output
+Output/
+
+# Benchmark reports
+*.csv
+
+# Compiled class files
+out/
+*.class
+
+# Local environment (use .env.example as template)
+.env
+
+# Local AI assistant notes
+CLAUDE.md
