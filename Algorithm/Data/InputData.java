@@ -71,12 +71,10 @@ public class InputData {
         int nodes = this.DepotNumber + this.CustomerNumber;
 
         /* ---------- COORDINATES (depots first, then customers) ---------- */
-        double[] abscissas = new double[nodes];
-        double[] ordinates = new double[nodes];
-        for (int n = 0; n < nodes; n++) {
-            abscissas[n] = Double.parseDouble(token[t++]);
-            ordinates[n] = Double.parseDouble(token[t++]);
-        }
+        Location[] locations = new Location[nodes];
+        for (int n = 0; n < nodes; n++)
+            locations[n] = new Location(Double.parseDouble(token[t++]),
+                                        Double.parseDouble(token[t++]));
 
         /* ---------- CAPACITIES, DEMANDS, COSTS ---------- */
         this.Capacity = (int) Double.parseDouble(token[t++]);
@@ -88,7 +86,7 @@ public class InputData {
             this.Demands[c] = (int) Double.parseDouble(token[t++]);
         this.Depots = new Depot[this.DepotNumber];
         for (int d = 0; d < this.DepotNumber; d++)
-            this.Depots[d] = new Depot(abscissas[d], ordinates[d], depotCapacities[d],
+            this.Depots[d] = new Depot(locations[d], depotCapacities[d],
                                        Double.parseDouble(token[t++]));
         this.RouteCost = Double.parseDouble(token[t++]);
         this.RealCosts = Double.parseDouble(token[t++]) == 1;
@@ -101,7 +99,7 @@ public class InputData {
         this.Distances = new double[nodes][nodes];
         for (int a = 0; a < nodes; a++)
             for (int b = 0; b < a; b++) {
-                double distance = Math.hypot(abscissas[a] - abscissas[b], ordinates[a] - ordinates[b]);
+                double distance = locations[a].distanceTo(locations[b]);
                 if (!this.RealCosts)
                     distance = Math.floor(distance * 100);
                 this.Distances[a][b] = this.Distances[b][a] = distance;
@@ -225,7 +223,7 @@ public class InputData {
                 || data.getDemand(0) != 17 || data.getDemand(19) != 16
                 || data.getDepot(0).openingCost() != 10841
                 || data.getDepot(4).openingCost() != 7497
-                || data.getDepot(0).abscissa() != 6 || data.getDepot(0).ordinate() != 7
+                || !data.getDepot(0).location().equals(new Location(6, 7))
                 || data.getRouteCost() != 1000 || data.hasRealCosts()
                 || data.getDepotToStopDistance(0, 0) != depot0ToStop0
                 || data.getStopToDepotDistance(0, 0) != depot0ToStop0)

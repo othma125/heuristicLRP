@@ -10,12 +10,11 @@ package Algorithm.Data;
  * <p>Distances are not held here; they live in the instance-wide matrix of
  * {@link InputData}, keyed by the depot's 0-based index.
  *
- * @param abscissa    x coordinate
- * @param ordinate    y coordinate
+ * @param location    where the depot stands
  * @param capacity    total demand the depot can serve
  * @param openingCost cost paid once the depot is used by at least one route
  *
  * @author Othmane EL YAAKOUBI
  */
-public record Depot(double abscissa, double ordinate, int capacity, double openingCost) {
+public record Depot(Location location, int capacity, double openingCost) {
 }
