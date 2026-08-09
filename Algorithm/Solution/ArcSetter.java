@@ -78,9 +78,10 @@ public class ArcSetter extends RecursiveAction {
                 Depot[] depots = this.graph.getData().getDepots();
                 Route[] candidates = new Route[depots.length];
                 for (Depot depot : depots) {
-                    Route candidate = new Route(this.graph.getData(), depot, sequence_as_array.clone());
+                    Route candidate = new Route(this.graph.getData(), this.Solution, depot, sequence_as_array.clone());
                     candidates[depot.index()] = candidate;
                     if (cumulative_demand <= this.graph.getData().getCapacity()
+                        && this.depotLoad(depot) + cumulative_demand <= depot.capacity()
                         && !EndingNode.UpdateLabel(this.Solution, candidate)) {
                         // candidate.IntraRoutesLocalSearch(this.graph.getData());
                         // EndingNode.UpdateLabel(this.Solution, candidate);
@@ -92,7 +93,11 @@ public class ArcSetter extends RecursiveAction {
                         // Merging extends an existing route, so the merged route keeps its depot.
                         Route new_route = candidates[old_route.getDepot().index()];
                         final int combined_demand = old_route.getSumDemand() + cumulative_demand;
-                        if (combined_demand <= this.graph.getData().getCapacity()) {
+                        // Extending a route leaves its depot serving the new stops as well, so the
+                        // depot has to have room for them on top of everything it already ships.
+                        final boolean depot_has_room = this.depotLoad(old_route.getDepot()) + cumulative_demand
+                                                       <= old_route.getDepot().capacity();
+                        if (combined_demand <= this.graph.getData().getCapacity() && depot_has_room) {
                             int[] combined_sequence1 = new int[old_route.getLength() + length];
                             for (int index = 0; index < combined_sequence1.length; index++) {
                                 if (index < old_route.getLength())
@@ -100,7 +105,10 @@ public class ArcSetter extends RecursiveAction {
                                 else
                                     combined_sequence1[index] = sequence_as_array[index - old_route.getLength()];
                             }
-                            Route combined_route1 = new Route(this.graph.getData(), old_route.getDepot(), combined_sequence1);
+                            // The combined route takes the place of old_route, so it takes over its
+                            // share of the depot opening cost rather than paying it a second time.
+                            Route combined_route1 = new Route(this.graph.getData(), old_route.getDepot(),
+                                                              combined_sequence1, old_route.paysDepotOpening());
                             if (!EndingNode.UpdateLabel(this.Solution, old_route, combined_route1)) {
                                 combined_route1.IntraRoutesLocalSearch(this.graph.getData());
                                 EndingNode.UpdateLabel(this.Solution, old_route, combined_route1);
@@ -112,13 +120,14 @@ public class ArcSetter extends RecursiveAction {
                                 else
                                     combined_sequence2[index] = old_route.getStop(index - sequence_as_array.length);
                             }
-                            Route combined_route2 = new Route(this.graph.getData(), old_route.getDepot(), combined_sequence2);
+                            Route combined_route2 = new Route(this.graph.getData(), old_route.getDepot(),
+                                                              combined_sequence2, old_route.paysDepotOpening());
                             if (!EndingNode.UpdateLabel(this.Solution, old_route, combined_route2)) {
                                 combined_route2.IntraRoutesLocalSearch(this.graph.getData());
                                 EndingNode.UpdateLabel(this.Solution, old_route, combined_route2);
                             }
                         }
-                        if (combined_demand <= 2 * this.graph.getData().getCapacity()) {
+                        if (combined_demand <= 2 * this.graph.getData().getCapacity() && depot_has_room) {
                             c = false;
                             LocalSearchMove lsm = old_route.getLSM(this.graph.getData(), new_route);
                             if (lsm != null) {
@@ -141,6 +150,18 @@ public class ArcSetter extends RecursiveAction {
             this.graph.getPhaser().arriveAndDeregister();
             this.graph.getArcsSetters().remove(this);
         }
+    }
+
+    /**
+     * @param depot a candidate depot
+     * @return the demand the partial solution already ships from that depot
+     */
+    private int depotLoad(Depot depot) {
+        int load = 0;
+        if (this.Solution != null)
+            for (Route route : this.Solution.getRoutes(depot))
+                load += route.getSumDemand();
+        return load;
     }
 
     @Override

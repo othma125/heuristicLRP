@@ -8,6 +8,7 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.Comparator;
+import java.util.Locale;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.IntStream;
 import java.util.stream.Collectors;
@@ -228,7 +229,7 @@ public class GiantTour implements Comparable<GiantTour>, AutoCloseable {
         try (BufferedWriter bw = new BufferedWriter(new FileWriter(outFile))) {
             bw.write(this.export());
             bw.newLine();
-            bw.write("Cost " + (int) this.getFitness());
+            bw.write("Cost " + String.format(Locale.US, "%.2f", this.getFitness()));
             bw.newLine();
         }
     }

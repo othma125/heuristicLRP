@@ -94,7 +94,7 @@ public class benchmark {
                                 gapStr = String.format(Locale.US, "%.2f", gap  * 100d);
                             }
                             // Write result to CSV
-                            writer.printf(Locale.US, "%s,%s,%s,%s,%s,%s,%s\n", entry.getKey(), data.getCustomerNumber(), data.getDepotNumber(), end_time, gt.getFitness(), Double.toString(best), gapStr);
+                            writer.printf(Locale.US, "%s,%s,%s,%s,%.2f,%s,%s\n", entry.getKey(), data.getCustomerNumber(), data.getDepotNumber(), end_time, gt.getFitness(), Double.toString(best), gapStr);
                         }
                         else {
                             System.out.println("No feasible solution found for " + data.FileName);

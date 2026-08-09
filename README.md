@@ -7,10 +7,14 @@ Each route is served from a `Depot`, the split builds one candidate route per
 candidate depot, and a `Solution` groups its routes by depot.
 
 **State:** the reader, the split, the local search and the memetic algorithm all
-run on LRP instances. The objective is still the travelled distance alone: depot
-opening costs and the route opening cost are parsed and exposed, yet not added to
-the solution cost, so results are not comparable to the published best known
-values. Depot capacities are not enforced either.
+run on LRP instances, against the full objective — travelled distance, one route
+opening cost per vehicle, and one opening cost per depot the solution uses, paid
+by the first route assigned to it. Vehicle and depot capacities are both
+enforced, the latter in `ArcSetter` wherever a route is attached to a depot.
+
+Costs are money, not distance: on integer instances (`0` flag) the Euclidean
+distance is scaled by 100 and truncated, which is what makes it commensurable
+with depot openings of ~10⁴ and a vehicle at 1000.
 
 ## Build
 

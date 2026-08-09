@@ -89,8 +89,6 @@ public class RightShift extends LocalSearchMove {
             this.FirstRoute.Improve(this.Gain);
         }
         else {
-            Depot first_depot = this.FirstRoute.getDepot();
-            Depot second_depot = this.SecondRoute.getDepot();
             int[] seq1 = new int[this.FirstRoute.getLength() + this.Degree + 1];
             for (int i = 0; i < this.I; i++) 
                 seq1[i] = this.FirstRoute.getStop(i);
@@ -103,8 +101,7 @@ public class RightShift extends LocalSearchMove {
                 seq2[i] = this.SecondRoute.getStop(i);
             for (int i = this.J + this.Degree + 1; i < this.SecondRoute.getLength(); i++) 
                 seq2[i - this.Degree - 1] = this.SecondRoute.getStop(i);
-            this.FirstRoute = seq1.length > 0 ? new Route(data, first_depot, seq1) : null;
-            this.SecondRoute = seq2.length > 0 ? new Route(data, second_depot, seq2) : null;
+            this.rebuild(data, seq1, seq2);
         }
     }
 

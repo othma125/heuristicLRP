@@ -113,7 +113,7 @@ final class Solver {
             }
         }, 5, 5, TimeUnit.SECONDS);
         try {
-            InputData data = new InputData(instance.getPath().replace("\\", "//"));
+            InputData data = new InputData(instance.getPath().replace("\\", "/"));
             GeneticAlgorithm algo = new GeneticAlgorithm(data);
             this.current = algo;
             algo.Run();
@@ -123,7 +123,7 @@ final class Solver {
                 GiantTour gt = algo.getBestGiantTour();
                 gt.export(data); // writes Output/<instance>/... and lets us read routes back
                 Http.sse(out, "sol", solOf(data, gt));
-                Http.sse(out, "result", resultJson(true, (int) gt.getFitness(), algo.getRunningTime(),
+                Http.sse(out, "result", resultJson(true, gt.getFitness(), algo.getRunningTime(),
                         routesOf(data, gt), Instances.bestKnownOf(instance)));
             } else {
                 Http.sse(out, "result", resultJson(false, 0, 0, "[]", Double.NaN));
@@ -201,13 +201,13 @@ final class Solver {
      * @param bestKnown the best known cost, or {@code NaN} if unpublished
      * @return the JSON string for the result event
      */
-    private static String resultJson(boolean feasible, int cost, long ms, String routes, double bestKnown) {
-        String best = Double.isNaN(bestKnown) ? "null" : Double.toString(bestKnown);
+    private static String resultJson(boolean feasible, double cost, long ms, String routes, double bestKnown) {
+        String best = Double.isNaN(bestKnown) ? "null" : String.format(Locale.US, "%.2f", bestKnown);
         String gap = Double.isNaN(bestKnown) || bestKnown == 0
                 ? "null"
                 : String.format(Locale.US, "%.2f", (cost - bestKnown) / bestKnown * 100d);
         return "{\"feasible\":" + feasible
-                + ",\"cost\":" + cost
+                + ",\"cost\":" + String.format(Locale.US, "%.2f", cost)
                 + ",\"timeMs\":" + ms
                 + ",\"best\":" + best
                 + ",\"gap\":" + gap

@@ -20,6 +20,23 @@ import java.util.stream.Stream;
 public final class BestKnown {
 
     private static final String FILE = "Algorithm/LRPLib/bks.csv";
+    // The Barreto files are named after their source instance, the published table after the
+    // paper and the instance size; the customer counts pair them up, and the two 32x5 files
+    // are told apart by their depot capacity (8000 first, 11000 second).
+    private static final Map<String, String> BARRETO_NAMES = Map.ofEntries(
+            Map.entry("christ50", "christofides69-50x5"),
+            Map.entry("christ75", "christofides69-75x10"),
+            Map.entry("christ100", "christofides69-100x10"),
+            Map.entry("das88", "daskin95-88x8"),
+            Map.entry("das150", "daskin95-150x10"),
+            Map.entry("gaspelle", "gaskell67-21x5"),
+            Map.entry("gaspelle2", "gaskell67-22x5"),
+            Map.entry("gaspelle3", "gaskell67-29x5"),
+            Map.entry("gaspelle4", "gaskell67-32x5-1"),
+            Map.entry("gaspelle5", "gaskell67-32x5-2"),
+            Map.entry("gaspelle6", "gaskell67-36x5"),
+            Map.entry("min27", "min92-27x5"),
+            Map.entry("min134", "min92-134x8"));
     private static Map<String, Double> Costs;
 
     private BestKnown() {
@@ -38,6 +55,7 @@ public final class BestKnown {
         String key = instance.toLowerCase(Locale.ROOT)
                              .replaceFirst("^coord", "")
                              .replaceFirst("\\.dat$", "");
+        key = BARRETO_NAMES.getOrDefault(key, key);
         // The Tuzun files carry a P the published table drops.
         return Costs.getOrDefault(key, Costs.getOrDefault(key.replaceFirst("^p", ""), Double.NaN));
     }

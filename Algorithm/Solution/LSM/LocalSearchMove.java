@@ -73,6 +73,33 @@ public abstract class LocalSearchMove {
     }
 
     /**
+     * Rebuilds both routes after an inter-route move. A depot keeps exactly one
+     * route carrying its opening cost, so the charge is inherited from the route
+     * each sequence replaces, and handed over when its carrier disappears and
+     * the surviving route serves the same depot.
+     *
+     * @param data the problem instance providing distances and demands
+     * @param seq1 the new sequence of the first route, empty if it disappears
+     * @param seq2 the new sequence of the second route, empty if it disappears
+     */
+    void rebuild(InputData data, int[] seq1, int[] seq2) {
+        Route first = this.FirstRoute, second = this.SecondRoute;
+        boolean pays_first = first.paysDepotOpening();
+        boolean pays_second = second.paysDepotOpening();
+        boolean same_depot = first.getDepot().equals(second.getDepot());
+        if (same_depot && seq1.length == 0 && pays_first) {
+            pays_first = false;
+            pays_second = true;
+        }
+        else if (same_depot && seq2.length == 0 && pays_second) {
+            pays_second = false;
+            pays_first = true;
+        }
+        this.FirstRoute = seq1.length > 0 ? new Route(data, first.getDepot(), seq1, pays_first) : null;
+        this.SecondRoute = seq2.length > 0 ? new Route(data, second.getDepot(), seq2, pays_second) : null;
+    }
+
+    /**
      * @return the cost change of the move (negative means improving)
      */
     public double getGain() {

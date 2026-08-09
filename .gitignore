@@ -1,8 +1,9 @@
 # Solver output
 Output/
 
-# Benchmark reports
+# Benchmark reports, but the best known costs are instance data
 *.csv
+!Algorithm/LRPLib/bks.csv
 
 # Compiled class files
 out/

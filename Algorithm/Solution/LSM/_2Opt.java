@@ -69,8 +69,6 @@ public class _2Opt extends LocalSearchMove {
             this.FirstRoute.Improve(this.Gain);
         }
         else {
-            Depot first_depot = this.FirstRoute.getDepot();
-            Depot second_depot = this.SecondRoute.getDepot();
             int[] seq1 = new int[this.I + this.J + 1];
             for (int i = 0; i < this.I; i++) 
                 seq1[i] = this.FirstRoute.getStop(i);
@@ -86,8 +84,7 @@ public class _2Opt extends LocalSearchMove {
                 seq2[k] = this.SecondRoute.getStop(i);
                 k++;
             }
-            this.FirstRoute = new Route(data, first_depot, seq1);
-            this.SecondRoute = new Route(data, second_depot, seq2);
+            this.rebuild(data, seq1, seq2);
         }
     }
 

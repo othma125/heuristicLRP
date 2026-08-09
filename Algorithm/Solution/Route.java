@@ -26,6 +26,9 @@ public final class Route implements Comparable<Route>, AutoCloseable {
     private int[] Sequence;
     private int SumDemand;
     private double TraveledDistance;
+    // A depot is paid for once however many routes leave it, so the charge rides on the first
+    // route assigned to it and every later route of the same depot travels free of it.
+    private boolean PaysDepotOpening;
     private boolean isClosed = false;
 
     @Override
@@ -70,25 +73,57 @@ public final class Route implements Comparable<Route>, AutoCloseable {
     }
 
     /**
-     * Builds a route from a stop sequence and computes its cost and demand.
+     * Builds a route serving a solution and computes its cost and demand. The
+     * route pays for opening its depot when the solution has no route there yet.
      *
-     * @param data  the problem instance providing distances and demands
-     * @param depot the depot the route starts and ends at
-     * @param seq   the ordered stop sequence
+     * @param data     the problem instance providing distances and demands
+     * @param solution the solution the route joins, or {@code null} for a route
+     *                 that stands alone and therefore opens its depot itself
+     * @param depot    the depot the route starts and ends at
+     * @param seq      the ordered stop sequence
      */
-    public Route(InputData data, Depot depot, int[] seq) {
+    public Route(InputData data, Solution solution, Depot depot, int[] seq) {
         this.Depot = depot;
         this.Sequence = seq;
-        this.setCost(data);
+        this.setCost(data, solution);
     }
 
     /**
-     * Computes and stores the total travelled distance and total demand of the
-     * current sequence, both legs measured from the route's depot.
+     * Builds a route with the depot opening charge decided by the caller, used
+     * when the route replaces another one and inherits its share of the charge.
      *
-     * @param data the problem instance providing distances and demands
+     * @param data              the problem instance providing distances and demands
+     * @param depot             the depot the route starts and ends at
+     * @param seq               the ordered stop sequence
+     * @param paysDepotOpening  whether this route carries the depot opening cost
      */
-    public void setCost(InputData data) {
+    public Route(InputData data, Depot depot, int[] seq, boolean paysDepotOpening) {
+        this.Depot = depot;
+        this.Sequence = seq;
+        this.setCost(data, paysDepotOpening);
+    }
+
+    /**
+     * Computes and stores the cost and total demand of the current sequence,
+     * charging the depot opening cost when this is the first route the solution
+     * assigns to that depot.
+     *
+     * @param data     the problem instance providing distances and demands
+     * @param solution the solution the route belongs to, or {@code null}
+     */
+    public void setCost(InputData data, Solution solution) {
+        this.setCost(data, solution == null || solution.getRoutes(this.Depot).isEmpty());
+    }
+
+    /**
+     * Computes and stores the cost and total demand of the current sequence:
+     * both legs measured from the route's depot, plus the depot opening cost
+     * when this route is the one carrying it.
+     *
+     * @param data             the problem instance providing distances and demands
+     * @param paysDepotOpening whether this route carries the depot opening cost
+     */
+    public void setCost(InputData data, boolean paysDepotOpening) {
         this.TraveledDistance = data.getDepotToStopDistance(this.Depot, this.Sequence[0]);
         this.SumDemand = 0;
         int i = 0;
@@ -98,6 +133,18 @@ public final class Route implements Comparable<Route>, AutoCloseable {
         }
         this.TraveledDistance += data.getStopToDepotDistance(this.Sequence[i], this.Depot);
         this.SumDemand += data.getDemand(this.Sequence[i]);
+        // Every route needs a vehicle, and the first route of a depot pays for opening it.
+        this.TraveledDistance += data.getRouteCost();
+        this.PaysDepotOpening = paysDepotOpening;
+        if (paysDepotOpening)
+            this.TraveledDistance += this.Depot.openingCost();
+    }
+
+    /**
+     * @return {@code true} when this route carries its depot's opening cost
+     */
+    public boolean paysDepotOpening() {
+        return this.PaysDepotOpening;
     }
     
     /**

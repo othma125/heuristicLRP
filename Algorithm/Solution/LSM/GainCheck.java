@@ -73,14 +73,17 @@ public class GainCheck {
             }
     }
 
-    /** @return a fresh copy of the route served by the first depot */
+    /** @return a fresh copy of the route served by the first depot, carrying its opening cost */
     private static Route first() {
-        return new Route(Data, FirstDepot, FIRST_STOPS.clone());
+        return new Route(Data, FirstDepot, FIRST_STOPS.clone(), true);
     }
 
-    /** @return a fresh copy of the route served by the second depot */
+    /**
+     * @return a fresh copy of the route served by the second depot; it pays for
+     *         its own depot only when that is a different depot from the first
+     */
     private static Route second() {
-        return new Route(Data, SecondDepot, SECOND_STOPS.clone());
+        return new Route(Data, SecondDepot, SECOND_STOPS.clone(), !SecondDepot.equals(FirstDepot));
     }
 
     /**
@@ -92,19 +95,43 @@ public class GainCheck {
      */
     private static void check(String name, LocalSearchMove move) {
         double before = distance(move.getFirstRoute()) + distance(move.getSecondRoute());
+        double charged_before = opening(move.getFirstRoute()) + opening(move.getSecondRoute());
         move.setGain(Data);
         double gain = move.getGain();
         move.Perform(Data);
         double after = distance(move.getFirstRoute()) + distance(move.getSecondRoute());
+        double charged_after = opening(move.getFirstRoute()) + opening(move.getSecondRoute());
         if (Math.abs(after - before - gain) > 1e-6)
             throw new AssertionError(name + " " + move + " announced " + gain
                     + " but moved from " + before + " to " + after);
+        // A move never opens a depot that was closed, so its charge can only stay or be saved.
+        if (charged_after > charged_before + 1e-6)
+            throw new AssertionError(name + " " + move + " raised the depot opening charge from "
+                    + charged_before + " to " + charged_after);
+        // A surviving route must keep its depot paid for.
+        for (Route route : new Route[]{move.getFirstRoute(), move.getSecondRoute()})
+            if (route != null && !route.paysDepotOpening()
+                && !isPaidBy(move.getFirstRoute(), route) && !isPaidBy(move.getSecondRoute(), route))
+                throw new AssertionError(name + " " + move + " left depot "
+                        + route.getDepot().index() + " served but unpaid");
         Checked++;
     }
 
     /**
+     * @param payer a route that may carry a depot charge
+     * @param route the route whose depot needs paying for
+     * @return {@code true} when {@code payer} carries the charge of that depot
+     */
+    private static boolean isPaidBy(Route payer, Route route) {
+        return payer != null && payer.paysDepotOpening() && payer.getDepot().equals(route.getDepot());
+    }
+
+    /**
+     * A move prices edges, not depot openings, so the check compares travelled
+     * distance alone and audits the opening charge separately.
+     *
      * @param route a route, or {@code null} when a move emptied it
-     * @return the route's distance, recomputed from its own depot
+     * @return the route's travelled distance, recomputed from its own depot
      */
     private static double distance(Route route) {
         if (route == null)
@@ -113,5 +140,13 @@ public class GainCheck {
         for (int k = 0; k < route.getLength() - 1; k++)
             distance += Data.getTwoStopsDistance(route.getStop(k), route.getStop(k + 1));
         return distance + Data.getStopToDepotDistance(route.getLast(), route.getDepot());
+    }
+
+    /**
+     * @param route a route, or {@code null} when a move emptied it
+     * @return the depot opening cost this route carries, zero when it carries none
+     */
+    private static double opening(Route route) {
+        return route != null && route.paysDepotOpening() ? route.getDepot().openingCost() : 0d;
     }
 }

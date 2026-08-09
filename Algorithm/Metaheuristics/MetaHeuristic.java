@@ -9,6 +9,7 @@ import Algorithm.Data.InputData;
 import java.util.List;
 import java.util.Collections;
 import java.util.ArrayList;
+import java.util.Locale;
 import java.util.concurrent.ThreadLocalRandom;
 
 /**
@@ -50,7 +51,8 @@ public abstract class MetaHeuristic {
         if (this.BestGiantTour == null || new_gt.compareTo(this.BestGiantTour) < 0) {
             this.BestSolutionReachingTime = System.currentTimeMillis();
             this.BestGiantTour = new_gt;
-            System.out.println(this.BestGiantTour.getFitness() + " after " + (this.BestSolutionReachingTime  - this.StartTime) + " ms");
+            System.out.println(String.format(Locale.US, "%.2f", this.BestGiantTour.getFitness())
+                    + " after " + (this.BestSolutionReachingTime - this.StartTime) + " ms");
             this.Trace.add(new long[]{this.BestSolutionReachingTime - this.StartTime, (long) this.BestGiantTour.getFitness()});
             return true;
         }

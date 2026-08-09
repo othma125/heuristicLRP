@@ -86,15 +86,12 @@ public class Swap extends LocalSearchMove {
             this.FirstRoute.Improve(this.Gain);
         }
         else {
-            Depot first_depot = this.FirstRoute.getDepot();
-            Depot second_depot = this.SecondRoute.getDepot();
             int[] seq1 = this.FirstRoute.getSequence().clone();
             int[] seq2 = this.SecondRoute.getSequence().clone();
             int aux = seq1[this.I];
             seq1[this.I] = seq2[this.J];
             seq2[this.J] = aux;
-            this.FirstRoute = new Route(data, first_depot, seq1);
-            this.SecondRoute = new Route(data, second_depot, seq2);
+            this.rebuild(data, seq1, seq2);
         }
     }
 
