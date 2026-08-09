@@ -58,19 +58,17 @@ HEURISTICLRP
 │   ├── Solution/         # Algorithm.Solution package
 │   │   ├── GiantTour.java
 │   │   ├── Route.java          # stops + serving depot + cost
-│   │   ├── Solution.java       # routes grouped by depot
+│   │   ├── Solution.java       # routes grouped by depot, with their load per depot
 │   │   ├── AuxiliaryGraph.java
 │   │   ├── AuxiliaryGraphNode.java
 │   │   ├── ArcSetter.java      # grows candidate routes, one per candidate depot
 │   │   ├── Move.java
-│   │   ├── SplitCheck.java     # self-check: split feasibility and cost
 │   │   └── LSM/          # Algorithm.Solution.LSM package
 │   │       ├── _2Opt.java
 │   │       ├── Swap.java
 │   │       ├── LeftShift.java
 │   │       ├── RightShift.java
-│   │       ├── LocalSearchMove.java
-│   │       └── GainCheck.java  # self-check: announced gain vs observed cost
+│   │       └── LocalSearchMove.java
 │   ├── main.java         # Entry point (single instance run)
 │   └── benchmark.java    # Entry point (batch run + .csv benchmark gap)
 ├── Web/                  # landing page + Web.server package
@@ -208,17 +206,11 @@ gap per instance. Instances the table does not list report `NA`.
 
 ### Self-checks
 
-No test framework — three runnable checks, each failing loudly if the logic breaks:
+No test framework — a runnable check that fails loudly if the logic breaks:
 
 ```bash
-java -cp out Algorithm.Data.InputData          # parser: sizes, depots, demands, distances
-java -cp out Algorithm.Solution.SplitCheck     # split: customers served once, both capacities,
-                                               # route costs, one depot charge per open depot
-java -cp out Algorithm.Solution.LSM.GainCheck  # moves: announced gain vs observed cost, across
-                                               # depots and on shapes that empty a route
+java -cp out Algorithm.Data.InputData  # parser: sizes, depots, demands, distances
 ```
-
-`SplitCheck` takes an optional instance path and a number of tours to split.
 
 ### Landing page (web UI)
 
