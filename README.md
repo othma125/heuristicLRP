@@ -19,13 +19,12 @@ Classes land in `out/`.
 ## Run
 
 ```bash
-java -cp out main                                                   # default instance
-java -cp out main Algorithm/LRPLib/Instances_Tuzun_LRP/coordP111112.dat
-java -cp out Algorithm.Data.InputData                               # reader self-check
+java -cp out main                      # loads the instance hardcoded in Algorithm/main.java
+java -cp out Algorithm.Data.InputData  # reader self-check
 ```
 
-`main` prints what the reader parsed: sizes, depot capacities and opening costs,
-total demand, and a few distances.
+`main` prints what the reader parsed: sizes, the depots, total demand, and a few
+distances. Change the instance by editing the path in `Algorithm/main.java`.
 
 ## Instances
 

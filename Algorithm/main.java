@@ -17,20 +17,16 @@ import java.io.IOException;
 public class main {
 
     /**
-     * @param args optional path to the instance file
+     * @param args the command line arguments (unused)
      * @throws IOException if the instance file cannot be read
      */
     public static void main(String[] args) throws IOException {
 
-        String file = args.length > 0 ? args[0]
-                : "Algorithm/LRPLib/Instances_Prodhon_LRP/coord20-5-1.dat";
-        InputData data = new InputData(file);
+        InputData data = new InputData("Algorithm/LRPLib/Instances_Prodhon_LRP/coord20-5-1.dat");
 
         System.out.println(data);
         for (int depot = 0; depot < data.getDepotNumber(); depot++)
-            System.out.println("depot " + depot
-                    + " capacity = " + data.getDepotCapacity(depot)
-                    + ", opening cost = " + data.getDepotCost(depot)
+            System.out.println(data.getDepot(depot)
                     + ", distance to customer 0 = " + data.getDepotToStopDistance(depot, 0));
         int totalDemand = 0;
         for (int stop = 0; stop < data.getCustomerNumber(); stop++)

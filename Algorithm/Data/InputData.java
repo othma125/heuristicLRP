@@ -31,8 +31,7 @@ public class InputData {
     private final int DepotNumber;
     private final int Capacity;
     private final int[] Demands;
-    private final int[] DepotCapacities;
-    private final double[] DepotCosts;
+    private final Depot[] Depots;
     private final double RouteCost;
     private final boolean RealCosts;
     // ponytail: full matrix instead of a lazy cache; LRPLib tops out at 210 nodes (~350 KB).
@@ -81,15 +80,16 @@ public class InputData {
 
         /* ---------- CAPACITIES, DEMANDS, COSTS ---------- */
         this.Capacity = (int) Double.parseDouble(token[t++]);
-        this.DepotCapacities = new int[this.DepotNumber];
+        int[] depotCapacities = new int[this.DepotNumber];
         for (int d = 0; d < this.DepotNumber; d++)
-            this.DepotCapacities[d] = (int) Double.parseDouble(token[t++]);
+            depotCapacities[d] = (int) Double.parseDouble(token[t++]);
         this.Demands = new int[this.CustomerNumber];
         for (int c = 0; c < this.CustomerNumber; c++)
             this.Demands[c] = (int) Double.parseDouble(token[t++]);
-        this.DepotCosts = new double[this.DepotNumber];
+        this.Depots = new Depot[this.DepotNumber];
         for (int d = 0; d < this.DepotNumber; d++)
-            this.DepotCosts[d] = Double.parseDouble(token[t++]);
+            this.Depots[d] = new Depot(abscissas[d], ordinates[d], depotCapacities[d],
+                                       Double.parseDouble(token[t++]));
         this.RouteCost = Double.parseDouble(token[t++]);
         this.RealCosts = Double.parseDouble(token[t++]) == 1;
         // Positional parsing silently shifts on a file that does not follow the format,
@@ -181,18 +181,10 @@ public class InputData {
 
     /**
      * @param depot 0-based depot index
-     * @return the capacity of the depot
+     * @return the depot, with its coordinates, capacity and opening cost
      */
-    public int getDepotCapacity(int depot) {
-        return this.DepotCapacities[depot];
-    }
-
-    /**
-     * @param depot 0-based depot index
-     * @return the opening cost of the depot
-     */
-    public double getDepotCost(int depot) {
-        return this.DepotCosts[depot];
+    public Depot getDepot(int depot) {
+        return this.Depots[depot];
     }
 
     /**
@@ -229,9 +221,11 @@ public class InputData {
         InputData data = new InputData("Algorithm/LRPLib/Instances_Prodhon_LRP/coord20-5-1.dat");
         double depot0ToStop0 = Math.floor(Math.hypot(20 - 6, 35 - 7) * 100); // 3130
         if (data.getCustomerNumber() != 20 || data.getDepotNumber() != 5
-                || data.getCapacity() != 70 || data.getDepotCapacity(4) != 140
+                || data.getCapacity() != 70 || data.getDepot(4).capacity() != 140
                 || data.getDemand(0) != 17 || data.getDemand(19) != 16
-                || data.getDepotCost(0) != 10841 || data.getDepotCost(4) != 7497
+                || data.getDepot(0).openingCost() != 10841
+                || data.getDepot(4).openingCost() != 7497
+                || data.getDepot(0).abscissa() != 6 || data.getDepot(0).ordinate() != 7
                 || data.getRouteCost() != 1000 || data.hasRealCosts()
                 || data.getDepotToStopDistance(0, 0) != depot0ToStop0
                 || data.getStopToDepotDistance(0, 0) != depot0ToStop0)
