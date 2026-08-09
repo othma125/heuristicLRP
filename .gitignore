@@ -1,9 +1,10 @@
 # Solver output
 Output/
 
-# Benchmark reports, but the best known costs are instance data
+# The best known costs are instance data, and the benchmark reports are results worth keeping
 *.csv
 !Algorithm/LRPLib/bks.csv
+!results *.csv
 
 # Compiled class files
 out/

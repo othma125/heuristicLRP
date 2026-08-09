@@ -202,7 +202,8 @@ java -Xmx4g -cp out benchmark
 
 This solves every `.dat` instance in the directory (in ascending size order), looks up each
 best known cost in `Algorithm/LRPLib/bks.csv`, and writes a `results <dir>.csv` report with the
-gap per instance. Instances the table does not list report `NA`.
+gap per instance. Instances the table does not list report `NA`. These `results *.csv` reports
+are committed, so a run's numbers stay comparable with the ones before it.
 
 ### Self-checks
 
