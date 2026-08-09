@@ -36,6 +36,20 @@ of `Algorithm/main.java` or `Algorithm/benchmark.java`. `benchmark` writes
 `results <dir>.csv` with one row per instance and the gap to the best known cost
 read from `bks.csv`; instances missing from that file report `NA`.
 
+## Web app
+
+```bash
+./run-server.sh          # compiles, starts the server, opens the browser
+./run-server.sh 9090     # on another port
+bash kill-server.sh      # stops a server left running
+```
+
+The port comes from the CLI argument, else `PORT` in `.env`, else 8081. The page
+lists the LRPLib folders and instances, streams the solver log live over
+Server-Sent Events, and draws the solution: one colour per route, each drawn
+from the depot serving it, with used depots filled and unused ones hollow.
+`Stop` ends the run early and still returns the best solution found.
+
 ## Instances
 
 `Algorithm/LRPLib/` holds the three standard benchmarks — Prodhon (30), Tuzun

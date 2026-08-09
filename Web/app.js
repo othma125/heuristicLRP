@@ -1,0 +1,247 @@
+// Author: Othmane
+
+const $ = id => document.getElementById(id);
+let solution = null; // {routes, cost}
+let coords = null;
+const PALETTE = ["#4f9cf9","#3fb950","#f0883e","#db61a2","#a371f7","#e3b341","#39c5cf","#f85149"];
+let vizShown = false; // the map/checklist appear only after the first Visualize click
+// refreshed by drawRoutes, in CSS px — feed the hover tooltip
+let hoverPts = []; // [{id, x, y}]
+let hoverSegs = []; // [{k, d, x1, y1, x2, y2}] for the drawn route legs only
+
+// theme (dark default, persisted)
+if (localStorage.theme) document.documentElement.dataset.theme = localStorage.theme;
+$("theme").onclick = () => {
+  const t = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
+  document.documentElement.dataset.theme = t; localStorage.theme = t;
+};
+
+async function json(url) { return (await fetch(url)).json(); }
+
+async function loadFolders() {
+  const folders = await json("/api/folders");
+  $("folder").innerHTML = folders.map(f => `<option>${f}</option>`).join("");
+  await loadInstances();
+}
+async function loadInstances() {
+  const insts = await json("/api/instances?folder=" + encodeURIComponent($("folder").value));
+  $("instance").innerHTML = insts.map(i => `<option>${i}</option>`).join("");
+  await showInstance();
+}
+$("folder").onchange = loadInstances;
+$("instance").onchange = showInstance;
+
+async function loadCoords() {
+  const folder = $("folder").value, file = $("instance").value;
+  if (!file) return null;
+  const text = await (await fetch(`/api/instance?folder=${encodeURIComponent(folder)}&file=${encodeURIComponent(file)}`)).text();
+  return parseInstance(text);
+}
+// draw the raw customer scatter so the map is never empty (the hero, pre-solve)
+async function showInstance() {
+  if (running) return;
+  coords = await loadCoords();
+  solution = null; $("viz").disabled = true;
+  if (vizShown && coords) drawRoutes(coords, [], null);
+}
+
+let running = false;
+function setRunning(on) {
+  running = on;
+  $("solve").textContent = on ? "Stop" : "Solve";
+  $("solve").style.background = $("solve").style.borderColor = on ? "var(--danger)" : "var(--accent2)";
+  $("folder").disabled = on;
+  $("instance").disabled = on;
+}
+
+$("solve").onclick = () => {
+  if (running) { $("solve").disabled = true; fetch("/api/stop"); return; } // let the final result arrive over SSE
+  const folder = $("folder").value, file = $("instance").value;
+  const log = $("log"); log.textContent = ""; $("stats").textContent = "";
+  $("solText").textContent = "";
+  $("routeList").innerHTML = ""; $("save").disabled = true; $("viz").disabled = true;
+  solution = null;
+  if (vizShown && coords) drawRoutes(coords, [], null); // keep the scatter visible while solving
+  setRunning(true);
+  const es = new EventSource(`/api/solve?folder=${encodeURIComponent(folder)}&file=${encodeURIComponent(file)}`);
+  es.addEventListener("log", e => { log.textContent += e.data + "\n"; log.scrollTop = log.scrollHeight; });
+  es.addEventListener("result", e => {
+    es.close(); setRunning(false); $("solve").disabled = false;
+    const r = JSON.parse(e.data);
+    if (r.feasible) {
+      solution = r; $("viz").disabled = false;
+      if (vizShown) { buildRouteList(); drawSolution(); }
+      const stat = (k, v, cls = "") => `<div class="stat"><span class="k">${k}</span><span class="v ${cls}">${v}</span></div>`;
+      const depots = new Set(r.routes.map(route => route.depot)).size;
+      let html = stat("Cost", r.cost) + stat("Routes", r.routes.length) + stat("Depots", depots)
+               + stat("Time", r.timeMs + " ms");
+      if (r.best != null) html += stat("Best known", r.best);
+      if (r.gap != null) html += stat("Gap", r.gap + "%", parseFloat(r.gap) <= 0.01 ? "good" : "warn");
+      $("stats").innerHTML = html;
+    } else {
+      $("stats").innerHTML = `<span style="color:var(--danger)">No feasible solution found.</span>`;
+    }
+  });
+  es.addEventListener("sol", e => { $("solText").textContent = e.data; $("save").disabled = false; });
+  es.onerror = () => { es.close(); setRunning(false); $("solve").disabled = false; };
+};
+
+$("save").onclick = async () => {
+  const file = $("instance").value, text = $("solText").textContent;
+  if (window.showSaveFilePicker) { // native "Save As" dialog, opens at Desktop
+    try {
+      const handle = await window.showSaveFilePicker({
+        suggestedName: file + ".sol", startIn: "desktop",
+        types: [{ description: "Solution file", accept: { "text/plain": [".sol"] } }],
+      });
+      const w = await handle.createWritable(); await w.write(text); await w.close();
+      $("stats").innerHTML += ` &nbsp; <b>Saved:</b> ${handle.name}`;
+    } catch (e) { if (e.name !== "AbortError") $("stats").innerHTML += ` &nbsp; <span style="color:var(--danger)">Save failed</span>`; }
+    return;
+  }
+  const a = document.createElement("a"); // fallback (Firefox/Safari): plain download
+  a.href = URL.createObjectURL(new Blob([text], { type: "text/plain" }));
+  a.download = file + ".sol"; a.click(); URL.revokeObjectURL(a.href);
+};
+
+// save the rendered map as an image; the extension is chosen on the page (#imgExt),
+// so the "Save As" dialog gets a single matching type (Windows only shows the first reliably)
+const MIME = { jpg: "image/jpeg", png: "image/png", webp: "image/webp" };
+
+// composite the canvas onto the theme background (JPEG/WebP have no transparency)
+function exportBlob(mime) {
+  const src = $("canvas"), out = document.createElement("canvas");
+  out.width = src.width; out.height = src.height;
+  const ctx = out.getContext("2d");
+  ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue("--bg").trim() || "#fff";
+  ctx.fillRect(0, 0, out.width, out.height);
+  ctx.drawImage(src, 0, 0);
+  return new Promise(r => out.toBlob(r, mime, 0.95));
+}
+
+$("saveImg").onclick = async () => {
+  const ext = $("imgExt").value, mime = MIME[ext];
+  const name = ($("instance").value || "lrp") + "_solution." + ext;
+  if (window.showSaveFilePicker) { // native "Save As" dialog, lets the user pick the folder
+    try {
+      const handle = await window.showSaveFilePicker({
+        suggestedName: name, startIn: "desktop",
+        types: [{ description: name, accept: { [mime]: ["." + ext] } }],
+      });
+      const w = await handle.createWritable(); await w.write(await exportBlob(mime)); await w.close();
+      $("stats").innerHTML += ` &nbsp; <b>Saved:</b> ${handle.name}`;
+    } catch (e) { if (e.name !== "AbortError") $("stats").innerHTML += ` &nbsp; <span style="color:var(--danger)">Save failed</span>`; }
+    return;
+  }
+  const a = document.createElement("a"); // fallback (Firefox/Safari): plain download
+  a.href = URL.createObjectURL(await exportBlob(mime)); a.download = name; a.click(); URL.revokeObjectURL(a.href);
+};
+
+// build the per-route checklist (an "All" master toggle + one colored box per route)
+function buildRouteList() {
+  if (!solution) return;
+  $("routeList").innerHTML =
+    `<label class="rchk"><input type="checkbox" id="allRoutes" checked>All</label>` +
+    solution.routes.map((r, i) =>
+      `<label class="rchk"><input type="checkbox" class="route" value="${i}" checked>` +
+      `<span class="sw" style="background:${PALETTE[i % PALETTE.length]}"></span>Route ${i+1} (depot ${r.depot})</label>`).join("");
+}
+
+async function drawSolution() {
+  if (!solution) return;
+  if (!coords) coords = await loadCoords();
+  const visible = new Set([...document.querySelectorAll("#routeList .route:checked")].map(c => +c.value));
+  if (coords) drawRoutes(coords, solution.routes, visible);
+}
+
+$("routeList").onchange = e => {
+  if (e.target.id === "allRoutes")
+    document.querySelectorAll("#routeList .route").forEach(c => c.checked = e.target.checked);
+  else
+    $("allRoutes").checked = [...document.querySelectorAll("#routeList .route")].every(c => c.checked);
+  drawSolution();
+};
+
+// enabled only once a solution exists; first click reveals the map/checklist
+$("viz").onclick = () => { vizShown = true; $("saveBar").style.display = "block"; buildRouteList(); drawSolution(); };
+
+// parse an LRPLib .dat: customer count, depot count, then the depot and the
+// customer coordinates. The trailing flag says whether costs are real (1) or
+// scaled by 100 and truncated (0), which the leg tooltip needs.
+function parseInstance(text) {
+  const t = text.trim().split(/\s+/).map(Number);
+  const customerCount = t[0], depotCount = t[1];
+  const depots = [], customers = [];
+  let k = 2;
+  for (let i = 0; i < depotCount; i++, k += 2) depots.push([t[k], t[k + 1]]);
+  for (let i = 0; i < customerCount; i++, k += 2) customers.push([t[k], t[k + 1]]);
+  return { depots, customers, realCosts: t[t.length - 1] === 1 };
+}
+
+function drawRoutes(inst, routes, visible) {
+  const cv = $("canvas"); cv.style.display = "block";
+  const dpr = window.devicePixelRatio || 1;
+  const cssW = cv.clientWidth || 1040, cssH = 560;
+  cv.width = cssW * dpr; cv.height = cssH * dpr; cv.style.height = cssH + "px"; // crisp on HiDPI
+  const ctx = cv.getContext("2d"); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, cssW, cssH);
+  const nodes = [...inst.depots, ...inst.customers];
+  const xs = nodes.map(p => p[0]), ys = nodes.map(p => p[1]);
+  const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys);
+  const pad = 30, W = cssW - 2 * pad, H = cssH - 2 * pad;
+  const sx = W / ((maxX - minX) || 1), sy = H / ((maxY - minY) || 1), s = Math.min(sx, sy);
+  const tx = x => pad + (x - minX) * s;
+  const ty = y => cssH - pad - (y - minY) * s; // flip Y
+  hoverPts = inst.depots.map((p, i) => ({ label: "Depot " + i, x: tx(p[0]), y: ty(p[1]) }))
+    .concat(inst.customers.map((p, i) => ({ label: "Stop " + (i + 1), x: tx(p[0]), y: ty(p[1]) })));
+
+  hoverSegs = [];
+  const opened = new Set();
+  routes.forEach((route, k) => {
+    if (visible && !visible.has(k)) return; // visible: null = all, else Set of route indices
+    opened.add(route.depot);
+    const depot = inst.depots[route.depot];
+    ctx.strokeStyle = PALETTE[k % PALETTE.length]; ctx.lineWidth = visible && visible.size === 1 ? 2.4 : 1.6;
+    const pts = [depot, ...route.stops.map(id => inst.customers[id - 1]).filter(Boolean), depot]; // .sol id n = customer n-1
+    ctx.beginPath(); ctx.moveTo(tx(pts[0][0]), ty(pts[0][1]));
+    for (let i = 1; i < pts.length; i++) {
+      const a = pts[i - 1], b = pts[i];
+      ctx.lineTo(tx(b[0]), ty(b[1]));
+      // matches InputData: raw euclidean on real-cost instances, scaled by 100 and truncated otherwise
+      const d = Math.hypot(b[0] - a[0], b[1] - a[1]);
+      hoverSegs.push({ k, d: inst.realCosts ? Math.round(d * 100) / 100 : Math.floor(d * 100),
+                       x1: tx(a[0]), y1: ty(a[1]), x2: tx(b[0]), y2: ty(b[1]) });
+    }
+    ctx.stroke();
+  });
+  // customers
+  ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue("--muted");
+  for (const c of inst.customers) { ctx.beginPath(); ctx.arc(tx(c[0]), ty(c[1]), 3, 0, 7); ctx.fill(); }
+  // depots: filled once a route uses them, hollow while they stay closed
+  inst.depots.forEach((d, i) => {
+    ctx.beginPath(); ctx.arc(tx(d[0]), ty(d[1]), 6, 0, 7);
+    if (opened.has(i)) { ctx.fillStyle = "#f85149"; ctx.fill(); }
+    else { ctx.strokeStyle = "#f85149"; ctx.lineWidth = 1.5; ctx.stroke(); }
+  });
+}
+
+// perpendicular distance from (x,y) to segment s, clamped to its endpoints
+function segDist(s, x, y) {
+  const dx = s.x2 - s.x1, dy = s.y2 - s.y1;
+  const t = Math.max(0, Math.min(1, ((x - s.x1) * dx + (y - s.y1) * dy) / (dx * dx + dy * dy || 1)));
+  return Math.hypot(x - s.x1 - t * dx, y - s.y1 - t * dy);
+}
+
+// hover tooltip: node within 8 px wins, else route leg within 5 px
+$("canvas").onmousemove = e => {
+  const tip = $("tip"), r = e.target.getBoundingClientRect();
+  const x = e.clientX - r.left, y = e.clientY - r.top;
+  const p = hoverPts.find(p => Math.hypot(p.x - x, p.y - y) < 8);
+  const s = !p && hoverSegs.find(s => segDist(s, x, y) < 5);
+  if (!p && !s) { tip.style.display = "none"; return; }
+  tip.textContent = p ? p.label : `Route ${s.k + 1} — ${s.d}`;
+  tip.style.left = (e.pageX + 12) + "px"; tip.style.top = (e.pageY + 12) + "px";
+  tip.style.display = "block";
+};
+$("canvas").onmouseleave = () => $("tip").style.display = "none";
+
+loadFolders();

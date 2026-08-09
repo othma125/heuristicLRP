@@ -14,4 +14,6 @@ if [ -z "$files" ]; then
     exit 0
 fi
 
-javac -encoding UTF-8 -d out -cp out -sourcepath Algorithm:Web $files && touch "$stamp"
+# Both packages are rooted at the project directory (Algorithm.*, Web.*), so an
+# incremental build needs "." on the sourcepath to resolve untouched siblings.
+javac -encoding UTF-8 -d out -cp out -sourcepath . $files && touch "$stamp"
