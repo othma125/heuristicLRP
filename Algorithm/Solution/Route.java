@@ -24,17 +24,17 @@ public final class Route implements Comparable<Route>, AutoCloseable {
 
     private final Depot Depot;
     private int[] Sequence;
-    private int SumDemand;
-    private double TraveledDistance;
+    private int sumDemand;
+    private double cost;
     // A depot is paid for once however many routes leave it, so the charge rides on the first
     // route assigned to it and every later route of the same depot travels free of it.
-    private boolean PaysDepotOpening;
+    private boolean payDepotOpening;
     private boolean isClosed = false;
 
     @Override
     public int hashCode() {
         int hash = this.Sequence.length;
-        hash = 31 * hash + this.SumDemand;
+        hash = 31 * hash + this.sumDemand;
         hash = 31 * hash + this.Depot.index();
         int sum = 0;
         for (int value : this.Sequence)
@@ -51,7 +51,7 @@ public final class Route implements Comparable<Route>, AutoCloseable {
         if (this.getClass() != obj.getClass())
             return false;
         final Route other = (Route) obj;
-        if (this.Sequence.length != other.Sequence.length || this.SumDemand != other.SumDemand
+        if (this.Sequence.length != other.Sequence.length || this.sumDemand != other.sumDemand
             || !this.Depot.equals(other.Depot))
             return false;
         return Arrays.equals(this.Sequence, other.Sequence);
@@ -68,8 +68,8 @@ public final class Route implements Comparable<Route>, AutoCloseable {
     public Route(Depot depot, int[] seq, int sum_demand, double dist) {
         this.Depot = depot;
         this.Sequence = seq;
-        this.SumDemand = sum_demand;
-        this.TraveledDistance = dist;
+        this.sumDemand = sum_demand;
+        this.cost = dist;
     }
 
     /**
@@ -124,27 +124,27 @@ public final class Route implements Comparable<Route>, AutoCloseable {
      * @param paysDepotOpening whether this route carries the depot opening cost
      */
     public void setCost(InputData data, boolean paysDepotOpening) {
-        this.TraveledDistance = data.getDepotToStopDistance(this.Depot, this.Sequence[0]);
-        this.SumDemand = 0;
+        this.cost = data.getDepotToStopDistance(this.Depot, this.Sequence[0]);
+        this.sumDemand = 0;
         int i = 0;
         while (i < this.Sequence.length - 1) {
-            this.SumDemand += data.getDemand(this.Sequence[i]);
-            this.TraveledDistance += data.getTwoStopsDistance(this.Sequence[i], this.Sequence[++i]);
+            this.sumDemand += data.getDemand(this.Sequence[i]);
+            this.cost += data.getTwoStopsDistance(this.Sequence[i], this.Sequence[++i]);
         }
-        this.TraveledDistance += data.getStopToDepotDistance(this.Sequence[i], this.Depot);
-        this.SumDemand += data.getDemand(this.Sequence[i]);
+        this.cost += data.getStopToDepotDistance(this.Sequence[i], this.Depot);
+        this.sumDemand += data.getDemand(this.Sequence[i]);
         // Every route needs a vehicle, and the first route of a depot pays for opening it.
-        this.TraveledDistance += data.getRouteCost();
-        this.PaysDepotOpening = paysDepotOpening;
-        if (paysDepotOpening)
-            this.TraveledDistance += this.Depot.openingCost();
+        this.cost += data.getRouteCost();
+        this.payDepotOpening = paysDepotOpening;
+        if (this.payDepotOpening)
+            this.cost += this.Depot.openingCost();
     }
 
     /**
      * @return {@code true} when this route carries its depot's opening cost
      */
     public boolean paysDepotOpening() {
-        return this.PaysDepotOpening;
+        return this.payDepotOpening;
     }
     
     /**
@@ -157,7 +157,7 @@ public final class Route implements Comparable<Route>, AutoCloseable {
      * @return {@code true} if an improving move was found and applied
      */
     public boolean StagnationBreaker(InputData data) {
-	int max = (int) Math.sqrt(this.Sequence.length);
+	    int max = (int) Math.sqrt(this.Sequence.length);
         for (int i = 0; i < this.Sequence.length - 1; i++) {
             LocalSearchMove best_lsm = null;
             for (int j = i + 1; j < this.Sequence.length; j++) {   
@@ -329,7 +329,7 @@ public final class Route implements Comparable<Route>, AutoCloseable {
      */
     @Override
     public int compareTo(Route route) {
-        return Double.compare(this.TraveledDistance * 100d, route.getTraveledDistance() * 100d);
+        return Double.compare(this.cost * 100d, route.getTraveledDistance() * 100d);
     }
 
     @Override
@@ -382,14 +382,14 @@ public final class Route implements Comparable<Route>, AutoCloseable {
      * @return the total demand served by the route
      */
     public int getSumDemand() {
-        return this.SumDemand;
+        return this.sumDemand;
     }
 
     /**
      * @return the total travelled distance of the route
      */
     public double getTraveledDistance() {
-        return this.TraveledDistance;
+        return this.cost;
     }
 
     /**
@@ -424,7 +424,7 @@ public final class Route implements Comparable<Route>, AutoCloseable {
      * @param gain the change in travelled distance
      */
     public void Improve(double gain) {
-        this.TraveledDistance += gain;
+        this.cost += gain;
     }
 
     /**
