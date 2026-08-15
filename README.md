@@ -168,7 +168,11 @@ lifting that restriction is a one-line change in `Solution.InterRoutesLocalSearc
   depot block carries four columns instead of two, and it has no published result.
 
 Distance computation:
-- Euclidean, stored as a dense matrix (LRPLib tops out at 210 nodes)
+- Euclidean, stored as a dense matrix (LRPLib tops out at 220 nodes, ~380 KB, so it stays
+  in CPU cache). Should instances ever get much larger, drop the matrix and compute each
+  distance on the fly rather than caching: measured on heuristicCVRP, an `Edge`-keyed
+  `ConcurrentHashMap` costs 22/49/72 ns per lookup at n=101/1001/10001 against 5.5/5.4/13.5
+  ns for plain recomputation.
 - Real-cost instances use the raw value; integer-cost instances scale by 100 and **round up**.
   The published format says "truncked", but only rounding up reproduces the published costs —
   on `coord20-5-2b` the optimum comes out at exactly 37542 that way, and 21 below it truncated.
