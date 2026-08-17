@@ -5,8 +5,7 @@ package Algorithm.Solution;
 import Algorithm.Data.Depot;
 import Algorithm.Data.InputData;
 import Algorithm.Solution.LSM.LocalSearchMove;
-import java.util.Set;
-import java.util.HashSet;
+import java.util.BitSet;
 import java.util.List;
 import java.util.Map;
 import java.util.LinkedHashMap;
@@ -29,7 +28,7 @@ public final class Solution implements Comparable<Solution>, AutoCloseable {
     // The demand each opened depot already ships, kept in step with the routes so that
     // checking whether a depot can take more stops stays a lookup instead of a scan.
     private final Map<Depot, Integer> DepotLoads;
-    private final Set<Integer> Stops;
+    private final BitSet Stops;
     private double TotalDistance;
 
     /**
@@ -40,7 +39,7 @@ public final class Solution implements Comparable<Solution>, AutoCloseable {
         this.TotalDistance = distance;
         this.Routes = new LinkedHashMap<>(capacity, 1f);
         this.DepotLoads = new LinkedHashMap<>(capacity, 1f);
-        this.Stops = new HashSet<>();
+        this.Stops = new BitSet();
     }
 
     /**
@@ -85,7 +84,7 @@ public final class Solution implements Comparable<Solution>, AutoCloseable {
      * @return {@code true} if the stop is already served by this solution
      */
     boolean contains(int stop) {
-        return this.Stops.contains(stop);
+        return this.Stops.get(stop);
     }
 
     /**
@@ -98,7 +97,7 @@ public final class Solution implements Comparable<Solution>, AutoCloseable {
         this.Routes.computeIfAbsent(new_route.getDepot(), depot -> new LinkedList<>()).add(new_route);
         this.DepotLoads.merge(new_route.getDepot(), new_route.getSumDemand(), Integer::sum);
         for (int stop : new_route.getSequence())
-            this.Stops.add(stop);
+            this.Stops.set(stop);
     }
 
     /**
@@ -183,7 +182,7 @@ public final class Solution implements Comparable<Solution>, AutoCloseable {
      * @return the concatenated stop sequence
      */
     int[] getNewSequence() {
-        int[] sequence = new int[this.Stops.size()];
+        int[] sequence = new int[this.Stops.cardinality()];
         int index = 0;
         for (List<Route> depotRoutes : this.Routes.values())
             for (Route route : depotRoutes)
