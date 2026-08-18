@@ -193,7 +193,7 @@ Distance computation:
 Edit `Algorithm/main.java` and set the LRPLib file path, then run:
 
 ```bash
-java -Xmx4g -cp out main
+java -Xmx4g -cp out Algorithm.main
 ```
 
 ### Run a benchmark (batch)
@@ -201,7 +201,7 @@ java -Xmx4g -cp out main
 Edit `Algorithm/benchmark.java` and set the LRPLib directory path, then run:
 
 ```bash
-java -Xmx4g -cp out benchmark
+java -Xmx4g -cp out Algorithm.benchmark
 ```
 
 This solves every `.dat` instance in the directory (in ascending size order), looks up each

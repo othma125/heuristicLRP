@@ -1,3 +1,5 @@
+package Algorithm;
+
 // Author: Othmane
 
 import Algorithm.Metaheuristics.GeneticAlgorithm;

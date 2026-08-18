@@ -1,3 +1,5 @@
+package Algorithm;
+
 // Author: Othmane
 
 import java.io.File;
