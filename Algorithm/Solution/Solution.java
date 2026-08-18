@@ -12,6 +12,7 @@ import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Collections;
 import java.util.LinkedList;
+import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * A complete LRP solution: the vehicle {@link Route}s grouped by the
@@ -23,6 +24,11 @@ import java.util.LinkedList;
  * @author Othmane EL YAAKOUBI
  */
 public final class Solution implements Comparable<Solution>, AutoCloseable {
+
+    // Restarting the scan after each accepted move recurses, and moves across depots keep the
+    // improving chain going long enough to overflow the stack, so the restarts are capped.
+    // ponytail: fixed cap, turn the recursion into a loop if 10 restarts leave gains on the table
+    private static final int MAX_LOCAL_SEARCH_DEPTH = 10;
 
     private final Map<Depot, List<Route>> Routes;
     // The demand each opened depot already ships, kept in step with the routes so that
@@ -51,9 +57,16 @@ public final class Solution implements Comparable<Solution>, AutoCloseable {
      * @param data the problem instance providing distances and capacity
      */
     void InterRoutesLocalSearch(InputData data) {
-        // Restarting the scan after each accepted move used to recurse, which overflows the
-        // stack now that moves across depots keep the improving chain going much longer.
+        this.InterRoutesLocalSearch(data, MAX_LOCAL_SEARCH_DEPTH);
+    }
+
+    private void InterRoutesLocalSearch(InputData data, int depth) {
+        if (depth == 0)
+            return;
+        // The route order biases which improving move is found first, so shuffling spreads the
+        // search over different pairs instead of always draining the first depot's routes.
         List<Route> routes = this.getRoutes();
+        Collections.shuffle(routes, ThreadLocalRandom.current());
         for (Route r1 : routes) {
             for (Route r2 : routes)
                 if (r1 != r2 && r1.getDepot() == r2.getDepot()) {
@@ -72,7 +85,7 @@ public final class Solution implements Comparable<Solution>, AutoCloseable {
                             this.add(lsm.getSecondRoute());
                             this.TotalDistance += lsm.getSecondRoute().getTraveledDistance();
                         }
-                        this.InterRoutesLocalSearch(data);
+                        this.InterRoutesLocalSearch(data, depth - 1);
                         return;
                     }
                 }

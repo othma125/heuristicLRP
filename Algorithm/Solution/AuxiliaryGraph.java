@@ -65,7 +65,7 @@ public class AuxiliaryGraph implements AutoCloseable {
         this.phaser.arriveAndAwaitAdvance();
         if (this.isFeasible())
             this.getLastNode().getSolutions()
-                                .parallelStream()
+                                .stream()
                                 .forEach(s -> s.InterRoutesLocalSearch(data));
     }
 
@@ -132,6 +132,13 @@ public class AuxiliaryGraph implements AutoCloseable {
      */
     double getLabel() {
         return this.getLastNode().getLabel();
+    }
+
+    /**
+     * @return the number of distinct optimal splits stored on the sink node
+     */
+    int getSolutionsCount() {
+        return this.getLastNode().getSolutions().size();
     }
 
     /**
