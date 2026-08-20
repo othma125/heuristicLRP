@@ -88,25 +88,33 @@ public class GiantTour implements Comparable<GiantTour>, AutoCloseable {
      * fitness as the pruning bound.
      *
      * @param data the problem instance
+     * @return {@code true} if the re-split improved on the current fitness
      */
-    public void Split(InputData data) {
-        this.Split(data, this.getFitness(), 0);
+    public boolean Split(InputData data) {
+        return this.Split(data, this.getFitness());
     }
 
     /**
-     * Splits the giant tour into routes via the auxiliary graph. When the graph
-     * is infeasible, the feasible prefix is kept and the remaining tail is
-     * randomly shuffled before retrying, as long as progress is being made.
+     * Splits the giant tour into routes via the auxiliary graph. A graph that
+     * does not beat {@code bound} is discarded; when the tour already holds a
+     * graph, each of its candidate solutions is re-split and the best result
+     * strictly under {@code bound} replaces it.
      *
-     * @param data              the problem instance
-     * @param bound             cost upper bound used to prune the graph
-     * @param feasibility_index the furthest feasible node reached so far, used to detect and stop non-progressing retries
+     * @param data  the problem instance
+     * @param bound cost upper bound used to prune the graph
+     * @return {@code true} if a split beating {@code bound} was accepted, i.e.
+     *         the tour now holds a strictly better graph than it did
      */
-    private void Split(InputData data, double bound, int feasibility_index) {
+    private boolean Split(InputData data, double bound) {
+        boolean c = false;
         if (this.AuxiliaryGraph == null) {
             AuxiliaryGraph graph = new AuxiliaryGraph(data, bound, this);
-            if (graph.isFeasible()) 
+            // getLabel() is infinite on an infeasible graph, so this one test covers
+            // both "feasible" and "better than what we had".
+            if (graph.getLabel() < bound) {
+                c = true;
                 this.AuxiliaryGraph = graph;
+            }
             else
                 graph.close();
         }
@@ -115,8 +123,7 @@ public class GiantTour implements Comparable<GiantTour>, AutoCloseable {
                                                     .getSolutions()
                                                     .parallelStream()
                                                     .map(solution -> new GiantTour(solution.getNewSequence()))
-                                                    .peek(gt -> gt.Split(data, bound, 0))
-                                                    .filter(GiantTour::isFeasible)
+                                                    .filter(gt -> gt.Split(data, bound))
                                                     .collect(Collectors.toList());
             GiantTour best = feasibleTours.stream()
                                           .min(Comparator.comparingDouble(GiantTour::getFitness))
@@ -125,12 +132,14 @@ public class GiantTour implements Comparable<GiantTour>, AutoCloseable {
                 if (gt != best)
                     gt.close();
             if (best != null) {
+                c = true;
                 this.Sequence = best.Sequence;
                 this.AuxiliaryGraph.close();
                 this.AuxiliaryGraph = best.AuxiliaryGraph;
             }
             feasibleTours.clear();
         }
+        return c;
     }
 
     /**
@@ -148,7 +157,7 @@ public class GiantTour implements Comparable<GiantTour>, AutoCloseable {
             new Move(i, j).Swap(this.Sequence);
         }
     }
-    
+
     /**
      * @param i position in the sequence
      * @return the stop at the given position

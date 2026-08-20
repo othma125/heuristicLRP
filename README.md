@@ -154,6 +154,11 @@ lifting that restriction is a one-line change in `Solution.InterRoutesLocalSearc
   - Fitness evaluations
   - Auxiliary graph construction
   - Local search on the split's candidate solutions
+  - Crossovers, on a dedicated two-thread pool: a generation submits one crossover per
+    individual and joins it, while the nested crossovers a new incumbent spawns are queued
+    and run alongside. The population is guarded by one lock, the incumbent by another
+    (always taken in that order), and the pool is kept narrow so the split's own parallel
+    work still has the common pool to itself.
 
 ---
 
