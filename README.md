@@ -99,7 +99,8 @@ HEURISTICLRP
 - A **directed auxiliary graph** is built from the giant tour.
 - Nodes represent customer positions.
 - Arcs represent feasible routes: for each segment, **one candidate route per candidate depot**
-  is grown, so the arc set carries the depot choice.
+  is grown, so the arc set carries the depot choice. A depot with no room left for the segment
+  is skipped before its candidate is built, since costing one is a walk over the whole segment.
 - Arc cost = routing cost of the segment from that depot, plus the vehicle cost, plus the depot
   opening cost when the segment is the first route assigned to that depot.
 - A route is rejected when it breaks vehicle capacity, or when its depot has no room left.
@@ -143,6 +144,10 @@ and a 2-opt reconnection between two depots carries two extra legs the CVRP vers
 A route replacing another inherits its share of the depot opening cost, so a depot is paid for
 exactly once. Inter-route moves are currently restricted to **routes sharing a depot**;
 lifting that restriction is a one-line change in `Solution.InterRoutesLocalSearch`.
+
+Each accepted inter-route move is followed by another pass, up to `max(10, sqrt(routes))` of
+them. The cap matters because the search runs on every candidate solution of every node: going
+all the way down to a local optimum there would starve the genetic loop of generations.
 
 ---
 

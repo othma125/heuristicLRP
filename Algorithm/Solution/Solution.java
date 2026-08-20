@@ -11,6 +11,7 @@ import java.util.Map;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.LinkedList;
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -25,10 +26,10 @@ import java.util.concurrent.ThreadLocalRandom;
  */
 public final class Solution implements Comparable<Solution>, AutoCloseable {
 
-    // Restarting the scan after each accepted move recurses, and moves across depots keep the
-    // improving chain going long enough to overflow the stack, so the restarts are capped.
-    // ponytail: fixed cap, turn the recursion into a loop if 10 restarts leave gains on the table
-    private static final int MAX_LOCAL_SEARCH_DEPTH = 10;
+    // Restarting the scan after each accepted move recurses, and the improving chain runs
+    // long enough to overflow the stack, so the number of passes is capped.
+    // ponytail: recursion with a cap, turn it into a loop if the cap starts costing gains
+    private static final int MIN_LOCAL_SEARCH_PASSES = 10;
 
     private final Map<Depot, List<Route>> Routes;
     // The demand each opened depot already ships, kept in step with the routes so that
@@ -54,14 +55,24 @@ public final class Solution implements Comparable<Solution>, AutoCloseable {
      * improving move exists. Routes replaced by a move are swapped in and the
      * total distance is updated accordingly.
      *
+     * <p>Each applied move is followed by another pass, up to
+     * max(10, sqrt(routes count)) of them, since a move creates two new routes
+     * the remaining ones may now combine with. The cap keeps the cost bounded:
+     * the search is called on every solution of every Pareto set, so descending
+     * all the way to a local optimum would starve the genetic loop of generations.
+     *
      * @param data the problem instance providing distances and capacity
      */
     void InterRoutesLocalSearch(InputData data) {
-        this.InterRoutesLocalSearch(data, MAX_LOCAL_SEARCH_DEPTH);
+        this.InterRoutesLocalSearch(data, Math.max(MIN_LOCAL_SEARCH_PASSES, (int) Math.sqrt(this.getRoutesCount())));
     }
 
-    private void InterRoutesLocalSearch(InputData data, int depth) {
-        if (depth == 0)
+    /**
+     * @param data   the problem instance providing distances and capacity
+     * @param passes the number of moves still allowed
+     */
+    private void InterRoutesLocalSearch(InputData data, int passes) {
+        if (passes == 0)
             return;
         // The route order biases which improving move is found first, so shuffling spreads the
         // search over different pairs instead of always draining the first depot's routes.
@@ -69,7 +80,7 @@ public final class Solution implements Comparable<Solution>, AutoCloseable {
         Collections.shuffle(routes, ThreadLocalRandom.current());
         for (Route r1 : routes) {
             for (Route r2 : routes)
-                if (r1 != r2 && r1.getDepot() == r2.getDepot()) {
+                if (r1 != r2 && r1.getDepot().equals(r2.getDepot())) {
                     LocalSearchMove lsm = r1.getLSM(data, r2);
                     if (lsm != null) {
                         lsm.Perform(data);
@@ -85,7 +96,7 @@ public final class Solution implements Comparable<Solution>, AutoCloseable {
                             this.add(lsm.getSecondRoute());
                             this.TotalDistance += lsm.getSecondRoute().getTraveledDistance();
                         }
-                        this.InterRoutesLocalSearch(data, depth - 1);
+                        this.InterRoutesLocalSearch(data, passes - 1);
                         return;
                     }
                 }
@@ -204,11 +215,19 @@ public final class Solution implements Comparable<Solution>, AutoCloseable {
         return sequence;
     }
 
+    /**
+     * Renders one line per route, grouped by the depot it is assigned to and
+     * ordered by cost within each depot, then the opened-depot count and the
+     * total cost.
+     *
+     * @return the formatted solution
+     */
     @Override
     public String toString() {
         StringBuilder sb = new StringBuilder();
         List<Route> sortedRoutes = this.getRoutes();
-        Collections.sort(sortedRoutes);
+        sortedRoutes.sort(Comparator.comparingInt((Route r) -> r.getDepot().index())
+                                    .thenComparing(Comparator.naturalOrder()));
         for (Route r : sortedRoutes) {
             sb.append("Depot ").append(r.getDepot().index()).append(" serves ");
             sb.append(r.getLength()).append(" stops : ");

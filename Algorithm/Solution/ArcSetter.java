@@ -4,9 +4,13 @@ package Algorithm.Solution;
 
 import Algorithm.Data.Depot;
 import Algorithm.Solution.LSM.LocalSearchMove;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.Phaser;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.RecursiveAction;
 
 /**
@@ -53,6 +57,12 @@ public class ArcSetter extends RecursiveAction {
             int length = 0;
             int cumulative_demand = 0;
             final List<Integer> sequence_as_list = new LinkedList<>();
+            final Depot[] depots = this.graph.getData().getDepots();
+            // The solution's routes do not change while this setter walks the tour, so the list
+            // is taken once. It is shuffled because the scan below stops at the first improving
+            // merge, and a fixed order would always try the same routes first.
+            final List<Route> solution_routes = this.Solution == null ? new LinkedList<>() : this.Solution.getRoutes();
+            Collections.shuffle(solution_routes, ThreadLocalRandom.current());
             // Setters already queued in the pool when the stop arrived would otherwise each
             // walk the whole tour running local search, so the walk checks the flag too.
             while (i < this.graph.getLength() && !this.graph.getData().isStopRequested()) {
@@ -75,67 +85,70 @@ public class ArcSetter extends RecursiveAction {
                 // candidate route is grown per candidate depot and the node keeps the best.
                 // ponytail: the constructor calls setCost, an O(length) walk per depot. Close
                 // the depot legs onto an incremental inner distance if the split gets too slow.
-                Depot[] depots = this.graph.getData().getDepots();
-                Route[] candidates = new Route[depots.length];
+                // Only depots with room for these stops on top of what they already ship can
+                // host the route, so the others are not even built: the Route constructor
+                // walks the whole sequence to cost it.
+                Map<Depot, Route> candidates = new HashMap<>(depots.length, 1f);
                 for (Depot depot : depots) {
+                    if (this.depotLoad(depot) + cumulative_demand > depot.capacity())
+                        continue;
                     Route candidate = new Route(this.graph.getData(), this.Solution, depot, sequence_as_array.clone());
-                    candidates[depot.index()] = candidate;
+                    candidates.put(depot, candidate);
                     if (cumulative_demand <= this.graph.getData().getCapacity()
-                        && this.depotLoad(depot) + cumulative_demand <= depot.capacity()
                         && !EndingNode.UpdateLabel(this.Solution, candidate)) {
                         candidate.IntraRoutesLocalSearch(this.graph.getData());
                         EndingNode.UpdateLabel(this.Solution, candidate);
                     }
                 }
                 boolean c = true;
-                if (this.Solution != null)
-                    for (Route old_route : this.Solution.getRoutes()) {
-                        // Merging extends an existing route, so the merged route keeps its depot.
-                        Route new_route = candidates[old_route.getDepot().index()];
-                        final int combined_demand = old_route.getSumDemand() + cumulative_demand;
-                        // Extending a route leaves its depot serving the new stops as well, so the
-                        // depot has to have room for them on top of everything it already ships.
-                        final boolean depot_has_room = this.depotLoad(old_route.getDepot()) + cumulative_demand <= old_route.getDepot().capacity();
-                        if (combined_demand <= this.graph.getData().getCapacity() && depot_has_room) {
-                            int[] combined_sequence1 = new int[old_route.getLength() + length];
-                            for (int index = 0; index < combined_sequence1.length; index++) {
-                                if (index < old_route.getLength())
-                                    combined_sequence1[index] = old_route.getStop(index);
-                                else
-                                    combined_sequence1[index] = sequence_as_array[index - old_route.getLength()];
-                            }
-                            // The combined route takes the place of old_route, so it takes over its
-                            // share of the depot opening cost rather than paying it a second time.
-                            Route combined_route1 = new Route(this.graph.getData(), old_route.getDepot(),
-                                                              combined_sequence1, old_route.paysDepotOpening());
-                            if (!EndingNode.UpdateLabel(this.Solution, old_route, combined_route1)) {
-                                combined_route1.IntraRoutesLocalSearch(this.graph.getData());
-                                EndingNode.UpdateLabel(this.Solution, old_route, combined_route1);
-                            }
-                            int[] combined_sequence2 = new int[old_route.getLength() + length];
-                            for (int index = 0; index < combined_sequence2.length; index++) {
-                                if (index < sequence_as_array.length)
-                                    combined_sequence2[index] = sequence_as_array[index];
-                                else
-                                    combined_sequence2[index] = old_route.getStop(index - sequence_as_array.length);
-                            }
-                            Route combined_route2 = new Route(this.graph.getData(), old_route.getDepot(),
-                                                              combined_sequence2, old_route.paysDepotOpening());
-                            if (!EndingNode.UpdateLabel(this.Solution, old_route, combined_route2)) {
-                                combined_route2.IntraRoutesLocalSearch(this.graph.getData());
-                                EndingNode.UpdateLabel(this.Solution, old_route, combined_route2);
-                            }
+                for (Route old_route : solution_routes) {
+                    // Merging extends an existing route, so the merged route keeps its depot.
+                    // Present whenever depot_has_room below holds: same test as the one
+                    // that filled the map.
+                    Route new_route = candidates.get(old_route.getDepot());
+                    final int combined_demand = old_route.getSumDemand() + cumulative_demand;
+                    // Extending a route leaves its depot serving the new stops as well, so the
+                    // depot has to have room for them on top of everything it already ships.
+                    final boolean depot_has_room = this.depotLoad(old_route.getDepot()) + cumulative_demand <= old_route.getDepot().capacity();
+                    if (combined_demand <= this.graph.getData().getCapacity() && depot_has_room) {
+                        int[] combined_sequence1 = new int[old_route.getLength() + length];
+                        for (int index = 0; index < combined_sequence1.length; index++) {
+                            if (index < old_route.getLength())
+                                combined_sequence1[index] = old_route.getStop(index);
+                            else
+                                combined_sequence1[index] = sequence_as_array[index - old_route.getLength()];
                         }
-                        if (combined_demand <= 2 * this.graph.getData().getCapacity() && depot_has_room) {
-                            c = false;
-                            LocalSearchMove lsm = old_route.getLSM(this.graph.getData(), new_route);
-                            if (lsm != null) {
-                                lsm.Perform(this.graph.getData());
-                                EndingNode.UpdateLabel(this.graph.getData(), this.Solution, old_route, lsm.getFirstRoute(), lsm.getSecondRoute());
-                                break;
-                            }
+                        // The combined route takes the place of old_route, so it takes over its
+                        // share of the depot opening cost rather than paying it a second time.
+                        Route combined_route1 = new Route(this.graph.getData(), old_route.getDepot(),
+                                                          combined_sequence1, old_route.paysDepotOpening());
+                        if (!EndingNode.UpdateLabel(this.Solution, old_route, combined_route1)) {
+                            combined_route1.IntraRoutesLocalSearch(this.graph.getData());
+                            EndingNode.UpdateLabel(this.Solution, old_route, combined_route1);
+                        }
+                        int[] combined_sequence2 = new int[old_route.getLength() + length];
+                        for (int index = 0; index < combined_sequence2.length; index++) {
+                            if (index < sequence_as_array.length)
+                                combined_sequence2[index] = sequence_as_array[index];
+                            else
+                                combined_sequence2[index] = old_route.getStop(index - sequence_as_array.length);
+                        }
+                        Route combined_route2 = new Route(this.graph.getData(), old_route.getDepot(),
+                                                          combined_sequence2, old_route.paysDepotOpening());
+                        if (!EndingNode.UpdateLabel(this.Solution, old_route, combined_route2)) {
+                            combined_route2.IntraRoutesLocalSearch(this.graph.getData());
+                            EndingNode.UpdateLabel(this.Solution, old_route, combined_route2);
                         }
                     }
+                    if (combined_demand <= 2 * this.graph.getData().getCapacity() && depot_has_room) {
+                        c = false;
+                        LocalSearchMove lsm = old_route.getLSM(this.graph.getData(), new_route);
+                        if (lsm != null) {
+                            lsm.Perform(this.graph.getData());
+                            EndingNode.UpdateLabel(this.graph.getData(), this.Solution, old_route, lsm.getFirstRoute(), lsm.getSecondRoute());
+                        }
+                    }
+                }
                 if (c && cumulative_demand > this.graph.getData().getCapacity()) {
                     this.NodeProcessingWith = this.graph.getLength();
                     this.graph.setNewSetters(EndingNode);
