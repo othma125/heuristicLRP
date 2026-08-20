@@ -37,6 +37,10 @@ public final class Solution implements Comparable<Solution>, AutoCloseable {
     private final Map<Depot, Integer> DepotLoads;
     private final BitSet Stops;
     private double TotalDistance;
+    // The room left on the emptiest opened depot, kept in step with the routes. It is the
+    // solution's second objective, minimised alongside the cost: a solution that packs its
+    // depots tightly has paid fewer opening costs for the demand it ships.
+    private int LeftoverLoad;
 
     /**
      * @param distance the initial total travelled distance
@@ -50,10 +54,11 @@ public final class Solution implements Comparable<Solution>, AutoCloseable {
     }
 
     /**
-     * Improves the solution by first optimising each route internally, then
-     * repeatedly applying the best available inter-route move until no further
-     * improving move exists. Routes replaced by a move are swapped in and the
-     * total distance is updated accordingly.
+     * Improves the solution by applying the first improving move found between
+     * two routes of the same depot, restarting the scan after each one. Routes
+     * replaced by a move are swapped in and the total distance is updated
+     * accordingly. Routes are optimised internally where they are built, not
+     * here.
      *
      * <p>Each applied move is followed by another pass, up to
      * max(10, sqrt(routes count)) of them, since a move creates two new routes
@@ -120,6 +125,10 @@ public final class Solution implements Comparable<Solution>, AutoCloseable {
     void add(Route new_route) {
         this.Routes.computeIfAbsent(new_route.getDepot(), depot -> new LinkedList<>()).add(new_route);
         this.DepotLoads.merge(new_route.getDepot(), new_route.getSumDemand(), Integer::sum);
+        // ponytail: an added route only ever lowers its depot's room, so this max can sit
+        // above the true one once a depot takes a second route. Walk DepotLoads here if the
+        // Pareto filter turns out to need the exact value.
+        this.LeftoverLoad = Math.max(this.LeftoverLoad, this.getLeftOver(new_route.getDepot()));
         for (int stop : new_route.getSequence())
             this.Stops.set(stop);
     }
@@ -130,6 +139,50 @@ public final class Solution implements Comparable<Solution>, AutoCloseable {
      */
     int getDepotLoad(Depot depot) {
         return this.DepotLoads.getOrDefault(depot, 0);
+    }
+
+    /**
+     * @param depot a candidate depot
+     * @return the demand that depot can still take on top of what this solution
+     *         already ships from it
+     */
+    int getLeftOver(Depot depot) {
+        return depot.capacity() - this.getDepotLoad(depot);
+    }
+
+    /**
+     * @return the room left on the emptiest depot this solution opens
+     */
+    int getLeftoverLoad() {
+        return this.LeftoverLoad;
+    }
+
+    /**
+     * The solution's second objective, minimised alongside the cost: the room
+     * left on the emptiest opened depot. A solution that packs its depots
+     * tightly has paid fewer opening costs for the demand it ships, so it is
+     * worth keeping even when it costs more than the node's best label.
+     *
+     * <p>Evaluated on a hypothetical change so a candidate can be scored before
+     * it is built, which is what the label relaxation needs.
+     *
+     * @param removed a route this solution would lose, or {@code null}
+     * @param added   the routes it would gain
+     * @return the largest room left on any depot that still ships something
+     */
+    int getLeftoverLoadAfter(Route removed, Route... added) {
+        // ponytail: copies the per-depot loads, which is a handful of entries; fold the
+        // deltas in place if the split ever spends measurable time here.
+        Map<Depot, Integer> loads = new LinkedHashMap<>(this.DepotLoads);
+        if (removed != null)
+            loads.merge(removed.getDepot(), -removed.getSumDemand(), Integer::sum);
+        for (Route route : added)
+            loads.merge(route.getDepot(), route.getSumDemand(), Integer::sum);
+        int leftover = 0;
+        for (Map.Entry<Depot, Integer> entry : loads.entrySet())
+            if (entry.getValue() > 0)
+                leftover = Math.max(leftover, entry.getKey().capacity() - entry.getValue());
+        return leftover;
     }
 
     /**

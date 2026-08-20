@@ -111,6 +111,16 @@ objective is not additive over arcs. Each node therefore keeps several labels, e
 its own set of opened depots — a labelling search rather than a plain shortest path. The split
 is exact on capacity and correct on cost, but no longer provably optimal for a given tour.
 
+A label is kept when it improves **either** of two minimised objectives: its total cost, or its
+**leftover** — the room still free on the emptiest depot it opens. Two labels of equal cost are
+therefore not interchangeable: the one that packs its depots tighter has paid fewer opening
+costs for the demand it ships, and the one that costs more may still be the only one able to
+absorb the rest of the tour. Only the **Pareto set** of a node (`AuxiliaryGraphNode.getParetoSet()`,
+non-dominated on both objectives) is extended into new arcs, local-searched at the sink, and
+re-split by the crossover; dominated labels are held but never grown. `Solution.LeftoverLoad`
+tracks the value incrementally as routes are added, so it is an upper bound once a depot takes
+a second route — a filter that errs towards keeping labels.
+
 ---
 
 ## Genetic Algorithm (Memetic framework)
@@ -118,7 +128,12 @@ is exact on capacity and correct on cost, but no longer provably optimal for a g
 Implemented in `Algorithm/Metaheuristics/GeneticAlgorithm.java`.
 
 ### Population
-- Initialized using randomized giant tours
+- Initialized using randomized giant tours: customers are packed by randomized Best-Fit
+  Decreasing into one cluster per candidate depot, all sized by the **smallest depot
+  capacity**, then the clusters are concatenated in random order and each shuffled
+  internally. The packing makes a depot assignment possible; the split still decides the
+  routes. (The CVRP version bins by vehicle capacity instead — in the LRP the vehicles are
+  unlimited and it is the depots that are scarce.)
 - Each individual is decoded using the auxiliary graph
 
 ### Selection

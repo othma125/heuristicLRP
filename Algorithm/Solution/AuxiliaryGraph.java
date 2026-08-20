@@ -64,7 +64,7 @@ public class AuxiliaryGraph implements AutoCloseable {
         }
         this.phaser.arriveAndAwaitAdvance();
         if (this.isFeasible())
-            this.getLastNode().getSolutions()
+            this.getLastNode().getParetoSet()
                                 .stream()
                                 .forEach(s -> s.InterRoutesLocalSearch(data));
     }
@@ -72,7 +72,8 @@ public class AuxiliaryGraph implements AutoCloseable {
     /**
      * Spawns successor arc setters from {@code node} once every setter still
      * running has advanced past it, so the node's labels are final before they
-     * are extended. Solutions above the pruning bound are skipped.
+     * are extended. Only the node's Pareto set is extended, and solutions above
+     * the pruning bound are skipped.
      *
      * @param node the node whose outgoing arcs should be scheduled
      */
@@ -90,7 +91,9 @@ public class AuxiliaryGraph implements AutoCloseable {
                     break;
                 }
             if (allMatch) 
-                for (Solution solution : node.getSolutions()) 
+                // Only the non-dominated labels are worth extending: the rest cost more and
+                // leave no more depot room, so nothing downstream can prefer them.
+                for (Solution solution : node.getParetoSet()) 
                     if (solution.getTotalDistance() < this.Bound)
                         for (GiantTour gt : this.GiantTours) {
                             ArcSetter setter = new ArcSetter(this, node, solution, gt);

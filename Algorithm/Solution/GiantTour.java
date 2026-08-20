@@ -7,8 +7,16 @@ import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.IntStream;
 import java.util.stream.Collectors;
@@ -120,8 +128,8 @@ public class GiantTour implements Comparable<GiantTour>, AutoCloseable {
         }
         else {
             var feasibleTours = this.AuxiliaryGraph.getLastNode()
-                                                    .getSolutions()
-                                                    .parallelStream()
+                                                    .getParetoSet()
+                                                    .stream()
                                                     .map(solution -> new GiantTour(solution.getNewSequence()))
                                                     .filter(gt -> gt.Split(data, bound))
                                                     .collect(Collectors.toList());
@@ -143,19 +151,74 @@ public class GiantTour implements Comparable<GiantTour>, AutoCloseable {
     }
 
     /**
-     * Initialises the sequence to the identity permutation of all customers and
-     * randomly shuffles it with a series of swaps.
+     * Initialises the sequence from clusters packed by randomized Best-Fit
+     * Decreasing: customers are taken in decreasing demand order (equal demands
+     * in random order) and each is placed in one of the two fullest clusters
+     * that still fit it, systematically minimising the empty capacity per
+     * cluster. The clusters are then concatenated in random order, each shuffled
+     * internally, so the packing does not leak demand order into the sequence:
+     * the split only needs each cluster's customers to be contiguous, and
+     * keeping the order random preserves the population diversity the crossover
+     * feeds on.
+     *
+     * <p>The bins are the candidate depots, not the vehicles as in the CVRP
+     * version: there is one per depot and all are sized by the smallest depot
+     * capacity, so what the packing makes possible is the depot assignment. The
+     * split still cuts each cluster into vehicle-sized routes on its own.
      *
      * @param data the problem instance
      */
     private void setRandomGiantTour(InputData data) {
-        this.Sequence = IntStream.range(0, data.getCustomerNumber()).toArray();
-        int max = this.Sequence.length / 2;
-        for (int k = 0; k < max; k++) {
-            int i = ThreadLocalRandom.current().nextInt(this.Sequence.length);
-            int j = ThreadLocalRandom.current().nextInt(this.Sequence.length);
-            new Move(i, j).Swap(this.Sequence);
+        ThreadLocalRandom rnd = ThreadLocalRandom.current();
+        int n = data.getCustomerNumber();
+        int[] customers = IntStream.range(0, n).toArray();
+        for (int i = n - 1; i > 0; i--)
+            new Move(i, rnd.nextInt(i + 1)).Swap(customers);
+        // stable sort after the shuffle: demand descending, equal demands in random order
+        customers = Arrays.stream(customers)
+                            .boxed()
+                            .sorted(Comparator.comparingInt(data::getDemand).reversed())
+                            .mapToInt(Integer::intValue)
+                            .toArray();
+        int depots = data.getDepotNumber();
+        int capacity = Arrays.stream(data.getDepots()).mapToInt(depot -> depot.capacity()).min().orElse(Integer.MAX_VALUE);
+        Map<Integer, Set<Integer>> clusters = new HashMap<>();
+        int[] loads = new int[depots];
+        for (int c : customers) {
+            int demand = data.getDemand(c);
+            // best fit: the two fullest clusters the customer fits in, picked at random
+            int d1 = -1, d2 = -1;
+            for (int d = 0; d < depots; d++)
+                if (loads[d] + demand <= capacity) {
+                    if (d1 < 0 || loads[d] > loads[d1]) {
+                        d2 = d1;
+                        d1 = d;
+                    }
+                    else if (d2 < 0 || loads[d] > loads[d2]) 
+                        d2 = d;
+                }
+            if (d2 >= 0 && rnd.nextBoolean())
+                d1 = d2;
+            if (d1 < 0) {
+                // nothing fits: overload the emptiest cluster, Split repairs
+                d1 = 0;
+                for (int d = 1; d < depots; d++)
+                    if (loads[d] < loads[d1])
+                        d1 = d;
+            }
+            clusters.computeIfAbsent(d1, x -> new HashSet<>()).add(c);
+            loads[d1] += demand;
         }
+        List<Set<Integer>> shuffled_clusters = new ArrayList<>(clusters.values());
+        Collections.shuffle(shuffled_clusters, rnd);
+        this.Sequence = shuffled_clusters.stream()
+                                        .flatMap(cluster -> {
+                                            List<Integer> stops = new ArrayList<>(cluster);
+                                            Collections.shuffle(stops, rnd);
+                                            return stops.stream();
+                                        })
+                                        .mapToInt(Integer::intValue)
+                                        .toArray();
     }
 
     /**

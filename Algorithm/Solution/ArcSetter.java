@@ -16,7 +16,9 @@ import java.util.concurrent.RecursiveAction;
 /**
  * A parallel task that, starting from one node and one partial solution,
  * grows candidate routes stop by stop along a giant tour and relaxes the
- * labels of the downstream nodes until capacity is exhausted.
+ * labels of the downstream nodes until capacity is exhausted. One task runs per
+ * non-dominated label of the starting node, so the partial solution it carries
+ * is what decides how much room each depot still has.
  *
  * @author Othmane EL YAAKOUBI
  */
@@ -43,11 +45,11 @@ public class ArcSetter extends RecursiveAction {
     }
 
     /**
-     * Walks forward from the starting node, accumulating stops into a
-     * candidate route and, at each reachable node, relaxing its label with one
-     * candidate route per candidate depot (and with routes merged into or
-     * split from the existing solution). Stops once capacity is exceeded, then
-     * deregisters from the graph's {@link Phaser}.
+     * Walks forward from the starting node, accumulating stops into a candidate
+     * route and, at each reachable node, relaxing its label with one candidate
+     * route per depot that still has room for the segment (and with routes
+     * merged into or split from the existing solution). Stops once capacity is
+     * exceeded, then deregisters from the graph's {@link Phaser}.
      */
     @Override
     protected void compute() {
@@ -90,7 +92,7 @@ public class ArcSetter extends RecursiveAction {
                 // walks the whole sequence to cost it.
                 Map<Depot, Route> candidates = new HashMap<>(depots.length, 1f);
                 for (Depot depot : depots) {
-                    if (this.depotLoad(depot) + cumulative_demand > depot.capacity())
+                    if (cumulative_demand > this.leftOver(depot))
                         continue;
                     Route candidate = new Route(this.graph.getData(), this.Solution, depot, sequence_as_array.clone());
                     candidates.put(depot, candidate);
@@ -109,7 +111,7 @@ public class ArcSetter extends RecursiveAction {
                     final int combined_demand = old_route.getSumDemand() + cumulative_demand;
                     // Extending a route leaves its depot serving the new stops as well, so the
                     // depot has to have room for them on top of everything it already ships.
-                    final boolean depot_has_room = this.depotLoad(old_route.getDepot()) + cumulative_demand <= old_route.getDepot().capacity();
+                    final boolean depot_has_room = cumulative_demand <= this.leftOver(old_route.getDepot());
                     if (combined_demand <= this.graph.getData().getCapacity() && depot_has_room) {
                         int[] combined_sequence1 = new int[old_route.getLength() + length];
                         for (int index = 0; index < combined_sequence1.length; index++) {
@@ -166,10 +168,11 @@ public class ArcSetter extends RecursiveAction {
 
     /**
      * @param depot a candidate depot
-     * @return the demand the partial solution already ships from that depot
+     * @return the demand that depot can still take, its whole capacity at the
+     *         source where there is no partial solution yet
      */
-    private int depotLoad(Depot depot) {
-        return this.Solution == null ? 0 : this.Solution.getDepotLoad(depot);
+    private int leftOver(Depot depot) {
+        return this.Solution == null ? depot.capacity() : this.Solution.getLeftOver(depot);
     }
 
     @Override
