@@ -48,7 +48,9 @@ public abstract class MetaHeuristic {
      * @return {@code true} if the incumbent was replaced
      */
     public boolean setBestSolution(GiantTour new_gt) {
-        if (this.BestGiantTour == null || new_gt.compareTo(this.BestGiantTour) < 0) {
+        if (new_gt == null)
+            return false;
+        if (this.BestGiantTour == null || new_gt == this.BestGiantTour || new_gt.compareTo(this.BestGiantTour) < 0) {
             this.BestSolutionReachingTime = System.currentTimeMillis();
             this.BestGiantTour = new_gt;
             System.out.println(String.format(Locale.US, "%.2f", this.BestGiantTour.getFitness())

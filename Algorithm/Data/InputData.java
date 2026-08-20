@@ -6,6 +6,8 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * LRPLIB instance parser and distance provider.
@@ -25,7 +27,7 @@ import java.nio.file.Path;
  *
  * @author Othmane EL YAAKOUBI
  */
-public class InputData {
+public class InputData implements AutoCloseable {
     public final String FileName;
     private final int CustomerNumber;
     private final int DepotNumber;
@@ -34,13 +36,14 @@ public class InputData {
     private final Depot[] Depots;
     private final double RouteCost;
     private final boolean RealCosts;
-    // ponytail: full matrix instead of a lazy cache; LRPLib tops out at 220 nodes (~380 KB),
-    // which stays in cache. If instances ever get much larger, drop the matrix and compute
-    // each distance on the fly — do NOT reach for a concurrent Edge cache. Measured on
-    // heuristicCVRP, an Edge-keyed ConcurrentHashMap costs 22/49/72 ns per lookup at n =
-    // 101/1001/10001 (it degrades as it stops fitting in cache) against 5.5/5.4/13.5 ns for
-    // plain recomputation: memoizing a sqrt is slower than the sqrt.
-    private final double[][] Distances;
+    // Keyed by undirected Edge, so one entry covers both directions; filled once in the
+    // constructor and never written again, which makes it safe to read from the parallel
+    // split workers without synchronization.
+    // ponytail: a HashMap costs more per lookup than the double[][] it replaces — measured on
+    // heuristicCVRP, an Edge-keyed map runs 22/49/72 ns at n = 101/1001/10001 against
+    // 5.5/5.4/13.5 ns for plain recomputation, and boxing every leg adds ~1.5 MB at n = 220.
+    // Go back to a flat matrix (or recompute on the fly) if distance lookup shows in a profile.
+    private final Map<Edge, Double> Distances;
     // Carried here because the instance is the one object every split and local search
     // already receives, so a stop can be seen deep in the search without new plumbing.
     private volatile boolean StopRequested = false;
@@ -55,6 +58,15 @@ public class InputData {
      */
     public boolean isStopRequested() {
         return this.StopRequested;
+    }
+
+    /**
+     * Requests any split work running on this instance to abort.
+     * This method is called automatically when used with try-with-resources.
+     */
+    @Override
+    public void close() {
+        this.StopRequested = true;
     }
 
     /**
@@ -100,7 +112,7 @@ public class InputData {
             throw new IOException(file + ": expected " + t + " numbers, found " + token.length);
 
         /* ---------- DISTANCES ---------- */
-        this.Distances = new double[nodes][nodes];
+        this.Distances = new HashMap<>();
         for (int a = 0; a < nodes; a++)
             for (int b = 0; b < a; b++) {
                 double distance = locations[a].distanceTo(locations[b]);
@@ -109,7 +121,7 @@ public class InputData {
                 // out at exactly 37542 this way, and 21 below it when truncated.
                 if (!this.RealCosts)
                     distance = Math.ceil(distance * 100);
-                this.Distances[a][b] = this.Distances[b][a] = distance;
+                this.Distances.put(new Edge(a, b), distance);
             }
     }
 
@@ -117,12 +129,24 @@ public class InputData {
        Distance access
        ====================== */
     /**
+     * Looks up the distance between two internal (depots first, then customers)
+     * node indices. Self-loops are not stored, hence the 0 default.
+     *
+     * @param node1 first internal index
+     * @param node2 second internal index
+     * @return the distance between the two nodes, or 0 if they are the same node
+     */
+    private double getDistance(int node1, int node2) {
+        return this.Distances.getOrDefault(new Edge(node1, node2), 0.0);
+    }
+
+    /**
      * @param stop1 first 0-based customer index
      * @param stop2 second 0-based customer index
      * @return the distance between the two customers
      */
     public double getTwoStopsDistance(int stop1, int stop2) {
-        return this.Distances[this.DepotNumber + stop1][this.DepotNumber + stop2];
+        return this.getDistance(this.DepotNumber + stop1, this.DepotNumber + stop2);
     }
 
     /**
@@ -131,7 +155,7 @@ public class InputData {
      * @return the distance from the customer back to the depot
      */
     public double getStopToDepotDistance(int stop, Depot depot) {
-        return this.Distances[this.DepotNumber + stop][depot.index()];
+        return this.getDistance(this.DepotNumber + stop, depot.index());
     }
 
     /**
@@ -140,7 +164,7 @@ public class InputData {
      * @return the distance from the depot out to the customer
      */
     public double getDepotToStopDistance(Depot depot, int stop) {
-        return this.Distances[depot.index()][this.DepotNumber + stop];
+        return this.getDistance(depot.index(), this.DepotNumber + stop);
     }
 
     /* ======================
@@ -221,18 +245,25 @@ public class InputData {
     // ponytail: self-check instead of a test framework, run with
     // `java -cp out Algorithm.Data.InputData` from the project root.
     public static void main(String[] args) throws IOException {
-        InputData data = new InputData("Algorithm/LRPLib/Instances_Prodhon_LRP/coord20-5-1.dat");
-        Depot[] depots = data.getDepots();
-        double depot0ToStop0 = Math.ceil(Math.hypot(20 - 6, 35 - 7) * 100); // 3131
-        if (data.getCustomerNumber() != 20 || data.getDepotNumber() != 5
-                || data.getCapacity() != 70 || depots[4].capacity() != 140
-                || data.getDemand(0) != 17 || data.getDemand(19) != 16
-                || depots[0].openingCost() != 10841 || depots[4].openingCost() != 7497
-                || !depots[0].location().equals(new Location(6, 7))
-                || data.getRouteCost() != 1000 || data.hasRealCosts()
-                || data.getDepotToStopDistance(depots[0], 0) != depot0ToStop0
-                || data.getStopToDepotDistance(0, depots[0]) != depot0ToStop0)
-            throw new AssertionError("LRP parsing is broken: " + data);
-        System.out.println("ok " + data);
+        try (InputData data = new InputData("Algorithm/LRPLib/Instances_Prodhon_LRP/coord20-5-1.dat")) {
+            Depot[] depots = data.getDepots();
+            double depot0ToStop0 = Math.ceil(Math.hypot(20 - 6, 35 - 7) * 100); // 3131
+            if (data.getCustomerNumber() != 20 || data.getDepotNumber() != 5
+                    || data.getCapacity() != 70 || depots[4].capacity() != 140
+                    || data.getDemand(0) != 17 || data.getDemand(19) != 16
+                    || depots[0].openingCost() != 10841 || depots[4].openingCost() != 7497
+                    || !depots[0].location().equals(new Location(6, 7))
+                    || data.getRouteCost() != 1000 || data.hasRealCosts()
+                    || data.getDepotToStopDistance(depots[0], 0) != depot0ToStop0
+                    || data.getStopToDepotDistance(0, depots[0]) != depot0ToStop0
+                    || data.getTwoStopsDistance(3, 7) != data.getTwoStopsDistance(7, 3)
+                    || data.getTwoStopsDistance(3, 3) != 0
+                    || data.isStopRequested())
+                throw new AssertionError("LRP parsing is broken: " + data);
+            data.close();
+            if (!data.isStopRequested())
+                throw new AssertionError("close() did not request a stop: " + data);
+            System.out.println("ok " + data);
+        }
     }
 }

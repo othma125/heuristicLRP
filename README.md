@@ -48,7 +48,8 @@ HEURISTICLRP
 │   │   ├── bks.csv           # best known costs extracted from the published tables
 │   │   └── files format.txt  # the .dat layout, as published
 │   ├── Data/             # Algorithm.Data package
-│   │   ├── InputData.java    # parser + distance matrix
+│   │   ├── InputData.java    # parser + distance map, AutoCloseable
+│   │   ├── Edge.java         # undirected node pair, key of the distance map
 │   │   ├── Depot.java        # location, capacity, opening cost
 │   │   ├── Location.java     # a point, with distanceTo
 │   │   └── BestKnown.java    # bks.csv lookup, shared by benchmark and web
@@ -168,11 +169,14 @@ lifting that restriction is a one-line change in `Solution.InterRoutesLocalSearc
   depot block carries four columns instead of two, and it has no published result.
 
 Distance computation:
-- Euclidean, stored as a dense matrix (LRPLib tops out at 220 nodes, ~380 KB, so it stays
-  in CPU cache). Should instances ever get much larger, drop the matrix and compute each
-  distance on the fly rather than caching: measured on heuristicCVRP, an `Edge`-keyed
-  `ConcurrentHashMap` costs 22/49/72 ns per lookup at n=101/1001/10001 against 5.5/5.4/13.5
-  ns for plain recomputation.
+- Euclidean, precomputed once in the `InputData` constructor into a `Map<Edge, Double>`.
+  `Edge` is a record holding an undirected node pair in canonical order, so one entry serves
+  both directions and a self-loop is simply absent (looked up as 0). The map is never written
+  after construction, so the parallel split workers read it without synchronization.
+- That map costs more per lookup than the dense `double[][]` it replaces: measured on
+  heuristicCVRP, an `Edge`-keyed map runs 22/49/72 ns at n=101/1001/10001 against 5.5/5.4/13.5
+  ns for plain recomputation, and boxing every leg costs ~1.5 MB at n=220 against ~380 KB.
+  Go back to a flat matrix, or recompute on the fly, if distance lookup shows up in a profile.
 - Real-cost instances use the raw value; integer-cost instances scale by 100 and **round up**.
   The published format says "truncked", but only rounding up reproduces the published costs —
   on `coord20-5-2b` the optimum comes out at exactly 37542 that way, and 21 below it truncated.
@@ -206,8 +210,9 @@ java -Xmx4g -cp out Algorithm.benchmark
 
 This solves every `.dat` instance in the directory (in ascending size order), looks up each
 best known cost in `Algorithm/LRPLib/bks.csv`, and writes a `results <dir>.csv` report with the
-gap per instance. Instances the table does not list report `NA`. These `results *.csv` reports
-are committed, so a run's numbers stay comparable with the ones before it.
+gap per instance, then prints the total run time over the whole batch. Instances the table does
+not list report `NA`. These `results *.csv` reports are committed, so a run's numbers stay
+comparable with the ones before it.
 
 ### Self-checks
 

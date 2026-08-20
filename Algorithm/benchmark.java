@@ -45,6 +45,8 @@ public class benchmark {
             System.err.println("Directory not found or empty: " + dir.getAbsolutePath());
             return;
         }
+        // Boxed so the lambda below can add to it.
+        long[] totalRunTime = {0};
         // Output CSV
         String outputFile = "results " + benchmarkDirPath.replace("/", ".") +".csv";
         try (PrintWriter writer = new PrintWriter(new FileWriter(outputFile))) {
@@ -74,6 +76,7 @@ public class benchmark {
                         InputData data = entry.getValue();
                         MetaHeuristic algorithm = new GeneticAlgorithm(data);
                         algorithm.Run();
+                        totalRunTime[0] += algorithm.getRunningTime();
                         if (algorithm.isFeasible()) {
                             GiantTour gt = algorithm.getBestGiantTour();
                             System.out.println(gt);
@@ -103,10 +106,15 @@ public class benchmark {
                             System.out.println();
                         }
                     });
+
+            // The instances live in a map for the whole batch, so they cannot be held in a
+            // try-with-resources; close them here instead.
+            datasets.values().forEach(InputData::close);
         } catch (IOException e) {
             System.err.println("Error writing results: " + e.getMessage());
         }
         System.out.println("All results stored in \"" + outputFile + "\"");
+        System.out.println("Total run time = " + totalRunTime[0] + " ms");
     }
 
     /**

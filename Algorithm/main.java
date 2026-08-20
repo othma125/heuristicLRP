@@ -24,19 +24,20 @@ public class main {
      */
     public static void main(String[] args) throws IOException {
 
-        InputData data = new InputData("Algorithm/LRPLib/Instances_Prodhon_LRP/coord20-5-1.dat");
 //        InputData data = new InputData("Algorithm/LRPLib/Instances_Tuzun_LRP/coordP111112.dat");
 //        InputData data = new InputData("Algorithm/LRPLib/Instances_Barreto_LRP/coordGaspelle.dat");
-        GeneticAlgorithm algorithm = new GeneticAlgorithm(data);
-        algorithm.Run();
+        try (InputData data = new InputData("Algorithm/LRPLib/Instances_Prodhon_LRP/coord20-5-1.dat")) {
+            GeneticAlgorithm algorithm = new GeneticAlgorithm(data);
+            algorithm.Run();
 
-        if (algorithm.isFeasible()) {
-            GiantTour gt = algorithm.getBestGiantTour();
-            System.out.println(gt);
-            //gt.export(data);
-            System.out.println("\nEnd Time = " + algorithm.getRunningTime() + " ms");
+            if (algorithm.isFeasible()) {
+                GiantTour gt = algorithm.getBestGiantTour();
+                System.out.println(gt);
+                //gt.export(data);
+                System.out.println("\nEnd Time = " + algorithm.getRunningTime() + " ms");
+            }
+            else
+                System.out.println("No feasible solution found\n");
         }
-        else
-            System.out.println("No feasible solution found\n");
     }
 }
