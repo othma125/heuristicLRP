@@ -104,6 +104,9 @@ HEURISTICLRP
 - Arc cost = routing cost of the segment from that depot, plus the vehicle cost, plus the depot
   opening cost when the segment is the first route assigned to that depot.
 - A route is rejected when it breaks vehicle capacity, or when its depot has no room left.
+- A node is also relaxed with the routes an inter-route move produces between a route of the
+  partial solution and the segment's candidate, **from any depot**, so the segment can end up
+  shared between two depots rather than served by one.
 - The **shortest source-to-sink path** gives the split.
 
 Because the depot opening cost is paid once per depot however many routes leave it, the
@@ -154,11 +157,17 @@ Implemented in `Algorithm/Metaheuristics/GeneticAlgorithm.java`.
 Applied both inside routes (intra-route) and between routes (inter-route). Moves implemented:
 2-Opt, Swap, Left Shift, Right Shift.
 
-Every depot leg a move touches is priced from the depot of the route that opens or closes it,
-and a 2-opt reconnection between two depots carries two extra legs the CVRP version never had.
+Every depot leg a move touches is priced from the depot of the route that opens or closes it.
 A route replacing another inherits its share of the depot opening cost, so a depot is paid for
-exactly once. Inter-route moves are currently restricted to **routes sharing a depot**;
-lifting that restriction is a one-line change in `Solution.InterRoutesLocalSearch`.
+exactly once.
+
+Swaps and shifts also run **between routes of two different depots**: the stops they move
+change depot along with the route that takes them, so the move only holds if the receiving
+depot has room for them on top of what it already ships, which is what `isFeasible` asks the
+solution. A move that empties a route is refused when the route carries its depot's opening
+cost and the depot keeps other routes, since the charge would have nobody left to ride on.
+2-opt stays **within one depot**: it sends a whole segment of demand each way at once, so its
+reconnections are not even enumerated across two depots.
 
 Each accepted inter-route move is followed by another pass, up to `max(10, sqrt(routes))` of
 them. The cap matters because the search runs on every candidate solution of every node: going
@@ -288,7 +297,7 @@ Run the server from the project root so it can find `.env`, `Algorithm/LRPLib/`,
 
 ## Current limitations
 
-- ❌ Inter-route local search only between routes of the same depot
+- ❌ 2-opt reconnections only between routes of the same depot
 - ❌ No time-to-target statistics
 - ❌ Single-objective only (total cost)
 - ❌ Homogeneous fleet only
@@ -299,7 +308,7 @@ These are planned extensions.
 
 ## Future work
 
-- Inter-depot local search moves
+- Inter-depot 2-opt reconnections
 - Time-to-target statistics
 - Multi-objective extensions
 - Heterogeneous fleet variants

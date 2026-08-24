@@ -5,12 +5,14 @@ package Algorithm.Solution.LSM;
 import Algorithm.Data.Depot;
 import Algorithm.Data.InputData;
 import Algorithm.Solution.Route;
+import Algorithm.Solution.Solution;
 
 /**
  * Right-shift (or-opt) move: relocates a block of {@code Degree + 1} stops
  * starting at position {@code J} of the second route into position {@code I} of
  * the first (or the same) route. The {@code with2Opt} flag reverses the
- * relocated block. It is the mirror image of {@link LeftShift}.
+ * relocated block. It is the mirror image of {@link LeftShift}, so the block
+ * may likewise cross over to the first route's depot.
  *
  * @author Othmane EL YAAKOUBI
  */
@@ -18,7 +20,6 @@ public class RightShift extends LocalSearchMove {
 
     private final int Degree;
     private final boolean with2Opt;
-    private final int FirstBorder;
 
     /**
      * @param data     the problem instance
@@ -33,7 +34,6 @@ public class RightShift extends LocalSearchMove {
         super("RightShift", i, j, routes);
         this.with2Opt = with2opt;
         this.Degree = degree;
-        this.FirstBorder = this.FirstRoute.getLength();
     }
 
     /** {@inheritDoc} */
@@ -107,16 +107,20 @@ public class RightShift extends LocalSearchMove {
 
     /** {@inheritDoc} */
     @Override
-    public boolean isFeasible(InputData data) {
+    public boolean isFeasible(InputData data, Solution solution) {
         if (this.OneSequence)
             return true;
-        int available_capacity = data.getCapacity();
-        for (int i = 0; i < this.FirstBorder; i++) 
-            available_capacity -= data.getDemand(this.FirstRoute.getStop(i));
         int sum_demand = 0;
         for (int i = this.J; i <= this.J + this.Degree; i++) 
             sum_demand += data.getDemand(this.SecondRoute.getStop(i));
-        return sum_demand <= available_capacity && this.SecondRoute.getSumDemand() - sum_demand <= data.getCapacity();
+        int demand1 = this.FirstRoute.getSumDemand() + sum_demand;
+        int demand2 = this.SecondRoute.getSumDemand() - sum_demand;
+        if (demand1 > data.getCapacity() || demand2 > data.getCapacity())
+            return false;
+        // Only the first route's depot takes demand on; the second one frees some, and
+        // frees all of it when the block is the whole route and the route goes away.
+        return this.hasRoom(solution, this.FirstRoute, demand1)
+               && (this.Border > this.Degree + 1 || this.keepsDepotPaid(solution, this.SecondRoute));
     }
 
     @Override

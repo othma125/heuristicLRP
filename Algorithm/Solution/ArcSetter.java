@@ -102,12 +102,7 @@ public class ArcSetter extends RecursiveAction {
                         EndingNode.UpdateLabel(this.Solution, candidate);
                     }
                 }
-                boolean c = true;
                 for (Route old_route : solution_routes) {
-                    // Merging extends an existing route, so the merged route keeps its depot.
-                    // Present whenever depot_has_room below holds: same test as the one
-                    // that filled the map.
-                    Route new_route = candidates.get(old_route.getDepot());
                     final int combined_demand = old_route.getSumDemand() + cumulative_demand;
                     // Extending a route leaves its depot serving the new stops as well, so the
                     // depot has to have room for them on top of everything it already ships.
@@ -142,16 +137,21 @@ public class ArcSetter extends RecursiveAction {
                             EndingNode.UpdateLabel(this.Solution, old_route, combined_route2);
                         }
                     }
-                    if (combined_demand <= 2 * this.graph.getData().getCapacity() && depot_has_room) {
-                        c = false;
-                        LocalSearchMove lsm = old_route.getLSM(this.graph.getData(), new_route);
-                        if (lsm != null) {
-                            lsm.Perform(this.graph.getData());
-                            EndingNode.UpdateLabel(this.graph.getData(), this.Solution, old_route, lsm.getFirstRoute(), lsm.getSecondRoute());
+                    // Unlike merging, a swap or a shift leaves the two routes on their own
+                    // depots and only moves stops between them, so the segment is offered to
+                    // every depot that could host it and not just to the one already serving
+                    // old_route. The move itself checks the receiving depot has room.
+                    if (combined_demand <= 2 * this.graph.getData().getCapacity())
+                        for (Route candidate : candidates.values()) {
+                            LocalSearchMove lsm = old_route.getLSM(this.graph.getData(), candidate, this.Solution);
+                            if (lsm != null) {
+                                lsm.Perform(this.graph.getData());
+                                EndingNode.UpdateLabel(this.graph.getData(), this.Solution, old_route, lsm.getFirstRoute(), lsm.getSecondRoute());
+                                break;
+                            }
                         }
-                    }
                 }
-                if (c && cumulative_demand > this.graph.getData().getCapacity()) {
+                if (cumulative_demand > this.graph.getData().getCapacity()) {
                     this.NodeProcessingWith = this.graph.getLength();
                     this.graph.setNewSetters(EndingNode);
                     break;

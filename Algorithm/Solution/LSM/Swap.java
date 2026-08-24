@@ -5,10 +5,13 @@ package Algorithm.Solution.LSM;
 import Algorithm.Data.Depot;
 import Algorithm.Data.InputData;
 import Algorithm.Solution.Route;
+import Algorithm.Solution.Solution;
 
 /**
  * Swap move: exchanges the stop at position {@code I} of the first route with
- * the stop at position {@code J} of the second (or the same) route.
+ * the stop at position {@code J} of the second (or the same) route. The two
+ * routes may serve different depots, in which case the two stops change depot
+ * with the routes that take them.
  *
  * @author Othmane EL YAAKOUBI
  */
@@ -97,22 +100,17 @@ public class Swap extends LocalSearchMove {
 
     /** {@inheritDoc} */
     @Override
-    public boolean isFeasible(InputData data) {
+    public boolean isFeasible(InputData data, Solution solution) {
         if (this.OneSequence)
             return true;
-        int availableCapacity1 = data.getCapacity();
-        for (int i = 0; i < this.FirstBorder; i++) 
-            if (i != this.I) {
-                availableCapacity1 -= data.getDemand(this.FirstRoute.getStop(i));
-            }
-        if (availableCapacity1 < 0 || data.getDemand(this.SecondRoute.getStop(this.J)) > availableCapacity1)
+        int transferred = data.getDemand(this.SecondRoute.getStop(this.J)) - data.getDemand(this.FirstRoute.getStop(this.I));
+        int demand1 = this.FirstRoute.getSumDemand() + transferred;
+        int demand2 = this.SecondRoute.getSumDemand() - transferred;
+        if (demand1 > data.getCapacity() || demand2 > data.getCapacity())
             return false;
-        int availableCapacity2 = data.getCapacity();
-        for (int j = 0; j < this.Border; j++) 
-            if (j != this.J) {
-                availableCapacity2 -= data.getDemand(this.SecondRoute.getStop(j));
-            }
-        return data.getDemand(this.FirstRoute.getStop(this.I)) <= availableCapacity2;
+        // Neither route can empty, so the depots only have to have room for what they end
+        // up shipping: the heavier stop moving one way is what can overload a depot.
+        return this.hasRoom(solution, this.FirstRoute, demand1) && this.hasRoom(solution, this.SecondRoute, demand2);
     }
 
     @Override

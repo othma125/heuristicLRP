@@ -5,11 +5,13 @@ package Algorithm.Solution.LSM;
 import Algorithm.Data.Depot;
 import Algorithm.Data.InputData;
 import Algorithm.Solution.Route;
+import Algorithm.Solution.Solution;
 
 /**
  * 2-opt move. Intra-route it reverses the segment between the two positions;
  * inter-route it reconnects the two routes by swapping their tails, reversing
- * one prefix. Removes edge crossings.
+ * one prefix. Removes edge crossings. The inter-route form is restricted to
+ * routes sharing a depot.
  *
  * @author Othmane EL YAAKOUBI
  */
@@ -90,27 +92,28 @@ public class _2Opt extends LocalSearchMove {
 
     /** {@inheritDoc} */
     @Override
-    public boolean isFeasible(InputData data) {
+    public boolean isFeasible(InputData data, Solution solution) {
         if (this.OneSequence)
             return true;
+        // Reconnecting sends a whole segment of demand each way at once, so across two
+        // depots it rewrites what both of them ship. The neighbourhood is kept inside a
+        // single depot, where only the two vehicle loads change.
+        if (!this.FirstRoute.getDepot().equals(this.SecondRoute.getDepot()))
+            return false;
         int available_capacity1 = data.getCapacity();
-        for (int i = 0; i < this.I; i++) {
+        for (int i = 0; i < this.I; i++) 
             available_capacity1 -= data.getDemand(this.FirstRoute.getStop(i));
-        }
         int sum_demand2 = 0;
-        for (int j = 0; j <= this.J; j++) {
+        for (int j = 0; j <= this.J; j++) 
             sum_demand2 += data.getDemand(this.SecondRoute.getStop(j));
-        }
         if (sum_demand2 > available_capacity1 || available_capacity1 < 0)
             return false;
         int available_capacity2 = data.getCapacity();
-        for (int j = this.J + 1; j < this.Border; j++) {
+        for (int j = this.J + 1; j < this.Border; j++) 
             available_capacity2 -= data.getDemand(this.SecondRoute.getStop(j));
-        }
         int sum_demand1 = 0;
-        for (int i = this.I; i < this.FirstBorder; i++) {
+        for (int i = this.I; i < this.FirstBorder; i++) 
             sum_demand1 += data.getDemand(this.FirstRoute.getStop(i));
-        }
         return sum_demand1 <= available_capacity2;
     }
 

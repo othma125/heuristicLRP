@@ -239,34 +239,41 @@ public final class Route implements Comparable<Route>, AutoCloseable {
     }
     
     /**
-     * Searches for the first improving, capacity-feasible inter-route move
-     * between this route and {@code other}, trying 2-opt, swap and left/right
-     * shift moves in turn.
+     * Searches for the first improving, feasible inter-route move between this
+     * route and {@code other}, trying 2-opt, swap and left/right shift moves in
+     * turn. Swaps and shifts also run between routes of two different depots,
+     * where the stops they move change depot and the solution says whether the
+     * receiving one has room; 2-opt stays within a depot, so its reconnections
+     * are not even enumerated across two.
      *
-     * @param data  the problem instance providing distances and capacity
-     * @param other the other route to exchange stops with
+     * @param data     the problem instance providing distances and capacity
+     * @param other    the other route to exchange stops with
+     * @param solution the solution the routes belong to, or {@code null} when
+     *                 no depot ships anything yet
      * @return an improving feasible move, or {@code null} if none exists
      */
-    public LocalSearchMove getLSM(InputData data, Route other) {
+    public LocalSearchMove getLSM(InputData data, Route other, Solution solution) {
         LocalSearchMove lsm;
-        for (int i = 0; i < this.Sequence.length; i++)
-            for (int j = 0; j < other.Sequence.length ; j++) {
-                lsm = new _2Opt(data, i , j, this, other);
-                lsm.setGain(data);
-                if (lsm.getGain() < 0d && lsm.isFeasible(data))
-                    return lsm;
-            }
-        for (int i = 0; i < other.Sequence.length; i++)
-            for (int j = 0; j < this.Sequence.length ; j++) {
-                lsm = new _2Opt(data, i , j, other, this);
-                lsm.setGain(data);
-                if (lsm.getGain() < 0d && lsm.isFeasible(data))
-                    return lsm;
-            }
+        if (this.Depot.equals(other.Depot)) {
+            for (int i = 0; i < this.Sequence.length; i++)
+                for (int j = 0; j < other.Sequence.length ; j++) {
+                    lsm = new _2Opt(data, i , j, this, other);
+                    lsm.setGain(data);
+                    if (lsm.getGain() < 0d && lsm.isFeasible(data, solution))
+                        return lsm;
+                }
+            for (int i = 0; i < other.Sequence.length; i++)
+                for (int j = 0; j < this.Sequence.length ; j++) {
+                    lsm = new _2Opt(data, i , j, other, this);
+                    lsm.setGain(data);
+                    if (lsm.getGain() < 0d && lsm.isFeasible(data, solution))
+                        return lsm;
+                }
+        }
         for (int i = 0; i < this.Sequence.length; i++)
             for (int j = 0; j < other.Sequence.length ; j++) {
                 lsm = new Swap(data, i, j, this, other);
-                if (lsm.isFeasible(data)) {
+                if (lsm.isFeasible(data, solution)) {
                     lsm.setGain(data);
                     if (lsm.getGain() < 0d)
                         return lsm;
@@ -278,7 +285,7 @@ public final class Route implements Comparable<Route>, AutoCloseable {
             for (int j = 0; j < other.Sequence.length ; j++) {
                 for (int degree = j == i + 1 ? 1 : 0; degree <= max2 && j + degree < other.Sequence.length; degree++) {
                     lsm = new RightShift(data, true, degree, i, j, this, other);
-                    if (lsm.isFeasible(data)) {
+                    if (lsm.isFeasible(data, solution)) {
                         lsm.setGain(data);
                         if (lsm.getGain() < 0d)
                             return lsm;
@@ -288,7 +295,7 @@ public final class Route implements Comparable<Route>, AutoCloseable {
                     if (degree == 0)
                         continue;
                     lsm = new RightShift(data, false, degree, i, j, this, other);
-                    if (lsm.isFeasible(data)) {
+                    if (lsm.isFeasible(data, solution)) {
                         lsm.setGain(data);
                         if (lsm.getGain() < 0d)
                             return lsm;
@@ -298,7 +305,7 @@ public final class Route implements Comparable<Route>, AutoCloseable {
                 }
                 for (int degree = j == i + 1 ? 1 : 0; degree <= max1 && i - degree >= 0; degree++) {
                     lsm = new LeftShift(data, true, degree, i, j, this, other);
-                    if (lsm.isFeasible(data)) {
+                    if (lsm.isFeasible(data, solution)) {
                         lsm.setGain(data);
                         if (lsm.getGain() < 0d)
                             return lsm;
@@ -308,7 +315,7 @@ public final class Route implements Comparable<Route>, AutoCloseable {
                     if (degree == 0)
                         continue;
                     lsm = new LeftShift(data, false, degree, i, j, this, other);
-                    if (lsm.isFeasible(data)) {
+                    if (lsm.isFeasible(data, solution)) {
                         lsm.setGain(data);
                         if (lsm.getGain() < 0d)
                             return lsm;

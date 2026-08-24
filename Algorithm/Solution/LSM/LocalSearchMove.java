@@ -5,6 +5,7 @@ package Algorithm.Solution.LSM;
 
 import Algorithm.Data.InputData;
 import Algorithm.Solution.Route;
+import Algorithm.Solution.Solution;
 
 
 /**
@@ -42,11 +43,47 @@ public abstract class LocalSearchMove {
     public abstract void Perform(InputData data);
 
     /**
-     * @param data the problem instance providing demands and capacity
+     * @param data     the problem instance providing demands and capacity
+     * @param solution the solution the routes belong to, used to price the
+     *                 depot room a move across two depots needs, or
+     *                 {@code null} when no depot ships anything yet
      * @return {@code true} if applying the move keeps both routes within
-     *         capacity
+     *         vehicle capacity and both depots within theirs
      */
-    public abstract boolean isFeasible(InputData data);
+    public abstract boolean isFeasible(InputData data, Solution solution);
+
+    /**
+     * Depot side of the feasibility test. Stops handed to a route of another
+     * depot take their demand with them, so the receiving depot has to have
+     * room for what its route ends up shipping. Within one depot the demand
+     * only moves between its own routes, so nothing has to be checked.
+     *
+     * @param solution the solution the routes belong to, or {@code null}
+     * @param route    the route whose depot receives the demand
+     * @param demand   the demand that route ships once the move is applied
+     * @return {@code true} if the depot can ship it
+     */
+    boolean hasRoom(Solution solution, Route route, int demand) {
+        if (this.FirstRoute.getDepot().equals(this.SecondRoute.getDepot()))
+            return true;
+        return demand <= (solution == null ? route.getDepot().capacity() : solution.getLeftOver(route));
+    }
+
+    /**
+     * Whether a route may be emptied without losing the depot opening cost it
+     * carries. {@link #rebuild} hands that charge over to the other route when
+     * both serve the same depot, but across two depots there is nobody to hand
+     * it to: the charge may only go away with the depot itself.
+     *
+     * @param solution the solution the route belongs to, or {@code null}
+     * @param route    the route the move would empty
+     * @return {@code true} if emptying it leaves every opened depot paid for
+     */
+    boolean keepsDepotPaid(Solution solution, Route route) {
+        if (this.FirstRoute.getDepot().equals(this.SecondRoute.getDepot()) || !route.paysDepotOpening())
+            return true;
+        return solution == null || solution.closesDepot(route);
+    }
 
     /**
      * @param name   the move's name, used in {@code toString}

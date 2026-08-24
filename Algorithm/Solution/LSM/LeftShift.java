@@ -5,12 +5,14 @@ package Algorithm.Solution.LSM;
 import Algorithm.Data.Depot;
 import Algorithm.Data.InputData;
 import Algorithm.Solution.Route;
+import Algorithm.Solution.Solution;
 
 /**
  * Left-shift (or-opt) move: relocates a block of {@code Degree + 1} stops
  * ending at position {@code I} of the first route to position {@code J} of the
  * second (or the same) route. The {@code with2Opt} flag reverses the relocated
- * block.
+ * block. The two routes may serve different depots, in which case the block is
+ * handed over to the second route's depot.
  *
  * @author Othmane EL YAAKOUBI
  */
@@ -119,16 +121,20 @@ public class LeftShift extends LocalSearchMove {
 
     /** {@inheritDoc} */
     @Override
-    public boolean isFeasible(InputData data) {
+    public boolean isFeasible(InputData data, Solution solution) {
         if (this.OneSequence)
             return true;
-        int available_capacity = data.getCapacity();
-        for (int i = 0; i < this.Border; i++) 
-            available_capacity -= data.getDemand(this.SecondRoute.getStop(i));
         int sum_demand = 0;
         for (int i = this.I - this.Degree; i <= this.I; i++) 
             sum_demand += data.getDemand(this.FirstRoute.getStop(i));
-        return sum_demand <= available_capacity && this.FirstRoute.getSumDemand() - sum_demand <= data.getCapacity();
+        int demand1 = this.FirstRoute.getSumDemand() - sum_demand;
+        int demand2 = this.SecondRoute.getSumDemand() + sum_demand;
+        if (demand1 > data.getCapacity() || demand2 > data.getCapacity())
+            return false;
+        // Only the second route's depot takes demand on; the first one frees some, and
+        // frees all of it when the block is the whole route and the route goes away.
+        return this.hasRoom(solution, this.SecondRoute, demand2)
+               && (this.FirstBorder > this.Degree + 1 || this.keepsDepotPaid(solution, this.FirstRoute));
     }
 
     @Override

@@ -55,7 +55,10 @@ public final class Solution implements Comparable<Solution>, AutoCloseable {
 
     /**
      * Improves the solution by applying the first improving move found between
-     * two routes of the same depot, restarting the scan after each one. Routes
+     * two routes, restarting the scan after each one. The two routes need not
+     * share a depot: a swap or a shift hands stops over to the other route's
+     * depot, which the move only accepts when that depot has room for them.
+     * A 2-opt reconnection stays within one depot. Routes
      * replaced by a move are swapped in and the total distance is updated
      * accordingly. Routes are optimised internally where they are built, not
      * here.
@@ -85,8 +88,8 @@ public final class Solution implements Comparable<Solution>, AutoCloseable {
         Collections.shuffle(routes, ThreadLocalRandom.current());
         for (Route r1 : routes) {
             for (Route r2 : routes)
-                if (r1 != r2 && r1.getDepot().equals(r2.getDepot())) {
-                    LocalSearchMove lsm = r1.getLSM(data, r2);
+                if (r1 != r2) {
+                    LocalSearchMove lsm = r1.getLSM(data, r2, this);
                     if (lsm != null) {
                         lsm.Perform(data);
                         this.remove(r1);
@@ -148,6 +151,36 @@ public final class Solution implements Comparable<Solution>, AutoCloseable {
      */
     int getLeftOver(Depot depot) {
         return depot.capacity() - this.getDepotLoad(depot);
+    }
+
+    /**
+     * The room a depot has for whatever a route ends up shipping from it, the
+     * route itself set aside. A route this solution already serves gives its
+     * demand back first, since a move rewrites it rather than adding to it; a
+     * route the solution does not serve yet, such as a candidate the split is
+     * still growing, weighs nothing on its depot until it is added.
+     *
+     * @param route a route of this solution, or one it does not serve yet
+     * @return the demand that route's depot can take
+     */
+    public int getLeftOver(Route route) {
+        int load = this.getDepotLoad(route.getDepot());
+        if (this.contains(route.getFirst()))
+            load -= route.getSumDemand();
+        return route.getDepot().capacity() - load;
+    }
+
+    /**
+     * Whether a depot goes with the route that leaves it, which is what decides
+     * if the opening cost that route carries may be dropped along with it. A
+     * route the solution does not serve yet counts as the only one of its depot
+     * when the depot ships nothing else.
+     *
+     * @param route a route this solution may lose
+     * @return {@code true} if no other route would keep the depot open
+     */
+    public boolean closesDepot(Route route) {
+        return this.getRoutes(route.getDepot()).size() <= 1;
     }
 
     /**
