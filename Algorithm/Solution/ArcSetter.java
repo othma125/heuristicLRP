@@ -4,6 +4,7 @@ package Algorithm.Solution;
 
 import Algorithm.Data.Depot;
 import Algorithm.Solution.LSM.LocalSearchMove;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedList;
@@ -58,7 +59,11 @@ public class ArcSetter extends RecursiveAction {
             int j = this.StartingNode.NodeIndex;
             int length = 0;
             int cumulative_demand = 0;
-            final List<Integer> sequence_as_list = new LinkedList<>();
+            // The walk grows this buffer and copies it out per candidate route: an int[]
+            // keeps the accumulation free of boxing and makes reading the stop just added
+            // an array access instead of a linked list traversal.
+            int[] sequence = new int[16];
+            int size = 0;
             final Depot[] depots = this.graph.getData().getDepots();
             // The solution's routes do not change while this setter walks the tour, so the list
             // is taken once. It is shuffled because the scan below stops at the first improving
@@ -75,14 +80,16 @@ public class ArcSetter extends RecursiveAction {
                     this.graph.setNewSetters(EndingNode);
                     continue;
                 }
-                while (sequence_as_list.size() < length) {
+                while (size < length) {
                     int stop = this.GiantTour.getStop(j++ % this.graph.getLength());
                     if (this.Solution == null || !this.Solution.contains(stop)) {
                         cumulative_demand += this.graph.getData().getDemand(stop);
-                        sequence_as_list.add(stop);
+                        if (size == sequence.length)
+                            sequence = Arrays.copyOf(sequence, 2 * size);
+                        sequence[size++] = stop;
                     }
                 }
-                int[] sequence_as_array = sequence_as_list.stream().mapToInt(Integer::intValue).toArray();
+                int[] sequence_as_array = Arrays.copyOf(sequence, size);
                 // The same stop sequence gives a different cost from every depot, so one
                 // candidate route is grown per candidate depot and the node keeps the best.
                 // ponytail: the constructor calls setCost, an O(length) walk per depot. Close
@@ -109,12 +116,8 @@ public class ArcSetter extends RecursiveAction {
                     final boolean depot_has_room = cumulative_demand <= this.leftOver(old_route.getDepot());
                     if (combined_demand <= this.graph.getData().getCapacity() && depot_has_room) {
                         int[] combined_sequence1 = new int[old_route.getLength() + length];
-                        for (int index = 0; index < combined_sequence1.length; index++) {
-                            if (index < old_route.getLength())
-                                combined_sequence1[index] = old_route.getStop(index);
-                            else
-                                combined_sequence1[index] = sequence_as_array[index - old_route.getLength()];
-                        }
+                        System.arraycopy(old_route.getSequence(), 0, combined_sequence1, 0, old_route.getLength());
+                        System.arraycopy(sequence_as_array, 0, combined_sequence1, old_route.getLength(), length);
                         // The combined route takes the place of old_route, so it takes over its
                         // share of the depot opening cost rather than paying it a second time.
                         Route combined_route1 = new Route(this.graph.getData(), old_route.getDepot(),
@@ -124,12 +127,8 @@ public class ArcSetter extends RecursiveAction {
                             EndingNode.UpdateLabel(this.Solution, old_route, combined_route1);
                         }
                         int[] combined_sequence2 = new int[old_route.getLength() + length];
-                        for (int index = 0; index < combined_sequence2.length; index++) {
-                            if (index < sequence_as_array.length)
-                                combined_sequence2[index] = sequence_as_array[index];
-                            else
-                                combined_sequence2[index] = old_route.getStop(index - sequence_as_array.length);
-                        }
+                        System.arraycopy(sequence_as_array, 0, combined_sequence2, 0, length);
+                        System.arraycopy(old_route.getSequence(), 0, combined_sequence2, length, old_route.getLength());
                         Route combined_route2 = new Route(this.graph.getData(), old_route.getDepot(),
                                                           combined_sequence2, old_route.paysDepotOpening());
                         if (!EndingNode.UpdateLabel(this.Solution, old_route, combined_route2)) {
