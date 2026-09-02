@@ -2,7 +2,6 @@
 
 package Algorithm.Solution.LSM;
 
-import Algorithm.Data.Depot;
 import Algorithm.Data.InputData;
 import Algorithm.Solution.Route;
 import Algorithm.Solution.Solution;
