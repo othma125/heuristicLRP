@@ -3,15 +3,15 @@
 package Algorithm.Metaheuristics;
 
 
-import Algorithm.Solution.GiantTour;
-import Algorithm.Data.InputData;
-
-import java.util.List;
-import java.util.Collections;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.locks.ReentrantLock;
+
+import Algorithm.Data.InputData;
+import Algorithm.Solution.GiantTour;
 
 /**
  * Base class for metaheuristic solvers. Holds the problem instance, tracks the

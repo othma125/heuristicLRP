@@ -2,8 +2,6 @@
 
 package Algorithm.Solution;
 
-import Algorithm.Data.Depot;
-import Algorithm.Solution.LSM.LocalSearchMove;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -11,8 +9,11 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Phaser;
-import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.RecursiveAction;
+import java.util.concurrent.ThreadLocalRandom;
+
+import Algorithm.Data.Depot;
+import Algorithm.Solution.LSM.LocalSearchMove;
 
 /**
  * A parallel task that, starting from one node and one partial solution,
@@ -191,7 +192,7 @@ public class ArcSetter extends RecursiveAction {
         ArcSetter other = (ArcSetter) obj;
         if (this.StartingNode.NodeIndex != other.StartingNode.NodeIndex)
             return false;
-        if (this.graph.getGiantTours().length > 1 && this.GiantTour.getStop(this.StartingNode.NodeIndex) != other.GiantTour.getStop(other.StartingNode.NodeIndex))
+        if (this.graph.getGiantTours().length > 1 && this.GiantTour != other.GiantTour)
             return false;
         return this.Solution == null ? other.Solution == null : this.Solution.getTotalDistance() == other.Solution.getTotalDistance() && this.Solution.getRoutesCount() == other.Solution.getRoutesCount();
     }

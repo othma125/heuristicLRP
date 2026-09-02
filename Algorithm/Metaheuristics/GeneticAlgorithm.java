@@ -2,8 +2,6 @@
 
 package Algorithm.Metaheuristics;
 
-import Algorithm.Data.InputData;
-import Algorithm.Solution.GiantTour;
 import java.util.Arrays;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutionException;
@@ -12,6 +10,9 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.locks.ReentrantLock;
+
+import Algorithm.Data.InputData;
+import Algorithm.Solution.GiantTour;
 
 /**
  * Memetic solver: a genetic algorithm over giant tours whose graph-based

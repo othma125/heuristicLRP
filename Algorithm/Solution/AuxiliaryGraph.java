@@ -2,15 +2,13 @@
 
 package Algorithm.Solution;
 
-import Algorithm.Data.InputData;
-import Algorithm.Solution.LSM.LocalSearchMove;
-import java.util.LinkedList;
-import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ForkJoinPool;
-import java.util.concurrent.RecursiveAction;
 import java.util.concurrent.Phaser;
+import java.util.concurrent.RecursiveAction;
+
+import Algorithm.Data.InputData;
 
 /**
  * The route-first/cluster-second split structure. Given one or more giant
