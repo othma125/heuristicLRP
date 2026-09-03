@@ -13,9 +13,6 @@ out/
 # Local environment (use .env.example as template)
 .env
 
-# Local AI assistant notes
-CLAUDE.md
-
 # Local scratch checks
 Algorithm/Solution/SplitCheck.java
 Algorithm/Solution/LSM/GainCheck.java

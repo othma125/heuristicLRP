@@ -231,6 +231,8 @@ Distance computation:
 Edit `Algorithm/main.java` and set the LRPLib file path, then run:
 
 ```bash
+bash run-main.sh              # compiles (incremental) then runs Algorithm.main
+# or run the compiled class directly:
 java -Xmx4g -cp out Algorithm.main
 ```
 
@@ -239,6 +241,8 @@ java -Xmx4g -cp out Algorithm.main
 Edit `Algorithm/benchmark.java` and set the LRPLib directory path, then run:
 
 ```bash
+bash run-benchmark.sh         # compiles (incremental) then runs Algorithm.benchmark
+# or run the compiled class directly:
 java -Xmx4g -cp out Algorithm.benchmark
 ```
 
