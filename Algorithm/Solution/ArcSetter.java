@@ -28,7 +28,7 @@ public class ArcSetter extends RecursiveAction {
 
     private final AuxiliaryGraph graph;
     final AuxiliaryGraphNode StartingNode;
-    final GiantTour GiantTour;
+    final int[] Tour;
     final Solution Solution;
     volatile int NodeProcessingWith;
 
@@ -36,13 +36,13 @@ public class ArcSetter extends RecursiveAction {
      * @param graph   the auxiliary graph this setter belongs to
      * @param node    the node this setter starts from
      * @param solution the partial solution reaching {@code node}, or {@code null} for the source
-     * @param gt      the giant tour whose ordering guides route growth
+     * @param tour    the giant tour snapshot whose ordering guides route growth
      */
-    ArcSetter(AuxiliaryGraph graph, AuxiliaryGraphNode node, Solution solution, GiantTour gt) {
+    ArcSetter(AuxiliaryGraph graph, AuxiliaryGraphNode node, Solution solution, int[] tour) {
         this.graph = graph;
         this.StartingNode = node;
         this.Solution = solution;
-        this.GiantTour = gt;
+        this.Tour = tour;
         this.NodeProcessingWith = this.StartingNode.NodeIndex;
     }
 
@@ -82,7 +82,7 @@ public class ArcSetter extends RecursiveAction {
                     continue;
                 }
                 while (size < length) {
-                    int stop = this.GiantTour.getStop(j++ % this.graph.getLength());
+                    int stop = this.Tour[j++ % this.graph.getLength()];
                     if (this.Solution == null || !this.Solution.contains(stop)) {
                         cumulative_demand += this.graph.getData().getDemand(stop);
                         if (size == sequence.length)
@@ -179,8 +179,8 @@ public class ArcSetter extends RecursiveAction {
     @Override
     public int hashCode() {
         int hash = this.StartingNode.NodeIndex;
-        if (this.graph.getGiantTours().length > 1)
-            hash = 31 * hash + System.identityHashCode(this.GiantTour);
+        if (this.graph.getTours().length > 1)
+            hash = 31 * hash + System.identityHashCode(this.Tour);
         return this.Solution != null ? 31 * hash + Double.hashCode(this.Solution.getTotalDistance()) : hash;
     }
 
@@ -193,7 +193,7 @@ public class ArcSetter extends RecursiveAction {
         ArcSetter other = (ArcSetter) obj;
         if (this.StartingNode.NodeIndex != other.StartingNode.NodeIndex)
             return false;
-        if (this.graph.getGiantTours().length > 1 && this.GiantTour != other.GiantTour)
+        if (this.graph.getTours().length > 1 && this.Tour != other.Tour)
             return false;
         return this.Solution == null ? other.Solution == null : this.Solution.getTotalDistance() == other.Solution.getTotalDistance() && this.Solution.getRoutesCount() == other.Solution.getRoutesCount();
     }
