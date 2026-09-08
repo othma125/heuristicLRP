@@ -1,12 +1,13 @@
-// Author: Othmane
-
 package Algorithm.Solution;
+
+// Author: Othmane
 
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.Phaser;
 import java.util.concurrent.RecursiveAction;
+import java.util.stream.Stream;
 
 import Algorithm.Data.InputData;
 
@@ -32,7 +33,6 @@ public class AuxiliaryGraph implements AutoCloseable {
     private AuxiliaryGraphNode[] Nodes;
     private final InputData Data;
     private final Set<ArcSetter> ArcsSetters;
-    private static final ForkJoinPool Pool = ForkJoinPool.commonPool();
     private final Phaser phaser = new Phaser(1);
 
     /**
@@ -62,7 +62,7 @@ public class AuxiliaryGraph implements AutoCloseable {
             ArcSetter setter = new ArcSetter(this, this.Nodes[0], null, tour);
             this.ArcsSetters.add(setter);
             this.phaser.register();
-            AuxiliaryGraph.Pool.execute(setter);
+            ForkJoinPool.commonPool().execute(setter);
         }
         this.phaser.arriveAndAwaitAdvance();
         if (this.isFeasible())
@@ -88,21 +88,22 @@ public class AuxiliaryGraph implements AutoCloseable {
         try {
             boolean allMatch = true;
             for (ArcSetter setter : this.ArcsSetters) 
-                if (setter.StartingNode.NodeIndex == node.NodeIndex || setter.NodeProcessingWith < node.NodeIndex) {
+                if (setter.StartingNode == node || setter.NodeProcessingWith < node.NodeIndex) {
                     allMatch = false;
                     break;
                 }
             if (allMatch) 
-                // Only the non-dominated labels are worth extending: the rest cost more and
-                // leave no more depot room, so nothing downstream can prefer them.
-                for (Solution solution : node.getParetoSet()) 
-                    if (solution.getTotalDistance() < this.Bound)
+                Stream.of(node.getBestSolution(), node.getBestLeftOver())
+                    .distinct()
+                    .filter(solution -> solution.getTotalDistance() < this.Bound)
+                    .forEach(solution -> {
                         for (int[] tour : this.Tours) {
                             ArcSetter setter = new ArcSetter(this, node, solution, tour);
                             this.ArcsSetters.add(setter);
                             this.phaser.register();
-                            AuxiliaryGraph.Pool.execute(setter);
+                            ForkJoinPool.commonPool().execute(setter);
                         }
+                    });
         } finally {
             node.Lock.unlock();
         }
