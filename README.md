@@ -77,7 +77,7 @@ HEURISTICLRP
 │   │   ├── Server.java     # Bootstrap + route table
 │   │   ├── Http.java       # HTTP/SSE transport helpers
 │   │   ├── Instances.java  # Read-only LRPLib dataset access
-│   │   └── Solver.java     # /api/solve (SSE) and /api/stop
+│   │   └── Solver.java     # /api/solve (SSE) and /api/stop, keyed by a per-tab run id
 │   ├── index.html
 │   ├── app.js
 │   └── styles.css
@@ -293,6 +293,9 @@ Then open `http://localhost:<port>`. Features:
 - Stats line reports cost, route count, **opened depot count**, and time
 - **Closing the tab stops the solve**: the server pings the browser every 5s, and a failed ping
   stops the solver. **Stop** works the same way, and both keep the best solution found so far
+- **Several tabs at once**: every tab gets its own run, its own log stream and its own **Stop**
+  button. The page sends a per-tab `run` id on `/api/solve` and `/api/stop`, so one tab can
+  never stop, silence or block another one's solve
 
 Run the server from the project root so it can find `.env`, `Algorithm/LRPLib/`, `Web/` and
 `profile.jpg`.

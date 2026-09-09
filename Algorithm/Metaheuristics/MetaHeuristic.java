@@ -3,6 +3,7 @@
 package Algorithm.Metaheuristics;
 
 
+import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -29,6 +30,13 @@ public abstract class MetaHeuristic {
     private GiantTour BestGiantTour = null;
     private final ReentrantLock BestLock = new ReentrantLock();
     public final long StagnationMinTime;
+
+    /**
+     * Where the search reports progress. Defaults to the process standard output;
+     * the web server points it at the requesting client's event stream so that
+     * concurrent runs never share one log.
+     */
+    public PrintStream Log = System.out;
 
     /** Incumbent trace: one {time_ms_since_StartTime, cost} pair per improvement. */
     public final List<long[]> Trace = Collections.synchronizedList(new ArrayList<>());
@@ -59,7 +67,7 @@ public abstract class MetaHeuristic {
             if (this.BestGiantTour == null || new_gt == this.BestGiantTour || new_gt.compareTo(this.BestGiantTour) < 0) {
                 this.BestSolutionReachingTime = System.currentTimeMillis();
                 this.BestGiantTour = new_gt;
-                System.out.println(String.format(Locale.US, "%.2f", this.BestGiantTour.getFitness())
+                this.Log.println(String.format(Locale.US, "%.2f", this.BestGiantTour.getFitness())
                         + " after " + (this.BestSolutionReachingTime - this.StartTime) + " ms");
                 this.Trace.add(new long[]{this.BestSolutionReachingTime - this.StartTime, (long) this.BestGiantTour.getFitness()});
                 return true;

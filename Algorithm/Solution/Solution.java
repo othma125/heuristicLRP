@@ -78,10 +78,12 @@ public final class Solution implements Comparable<Solution>, AutoCloseable {
 
     /**
      * @param data   the problem instance providing distances and capacity
-     * @param passes the number of moves still allowed
+     * @param passes the number of moves still allowed; the descent also ends as
+     *        soon as a stop is requested
      */
     private void InterRoutesLocalSearch(InputData data, int passes) {
-        if (passes == 0)
+        // A stop ends the descent here, keeping the improvements already applied.
+        if (passes == 0 || data.isStopRequested())
             return;
         // The route order biases which improving move is found first, so shuffling spreads the
         // search over different pairs instead of always draining the first depot's routes.

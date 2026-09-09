@@ -158,12 +158,14 @@ public final class Route implements Comparable<Route>, AutoCloseable {
      * and applies it if it is improving. Used to escape local optima when the
      * regular local search stalls.
      *
+     * <p>Gives up as soon as a stop is requested, reporting no move.
+     *
      * @param data the problem instance providing distances and demands
      * @return {@code true} if an improving move was found and applied
      */
     public boolean StagnationBreaker(InputData data) {
 	    int max = (int) Math.sqrt(this.Sequence.length);
-        for (int i = 0; i < this.Sequence.length - 1; i++) {
+        for (int i = 0; i < this.Sequence.length - 1 && !data.isStopRequested(); i++) {
             LocalSearchMove best_lsm = null;
             for (int j = i + 1; j < this.Sequence.length; j++) {   
                 if (j > i + 1) {
@@ -220,16 +222,22 @@ public final class Route implements Comparable<Route>, AutoCloseable {
     /**
      * Applies improving 2-opt moves within the route, capped at
      * {@code sqrt(length)} improvements per pass, then probabilistically either
-     * repeats the pass or invokes {@link #StagnationBreaker(InputData)}.
+     * repeats the pass or invokes {@link #StagnationBreaker(InputData)}. Returns
+     * immediately once a stop has been requested.
      *
      * @param data        the problem instance providing distances and demands
      * @param probability controls how likely the search is to stop rather than
      *                    recurse for another pass
      */
     public void IntraRoutesLocalSearch(InputData data, double probability) {
+        // Every local-search pass in the split graph funnels through here, so this is the
+        // one place a stop request has to be honoured: without it a Stop click waits
+        // minutes for the recursion to unwind on a large instance.
+        if (data.isStopRequested())
+            return;
         int max = (int) Math.sqrt(this.Sequence.length);
         int improvementCounter = 0;
-        for (int i = 0; improvementCounter < max && i < this.Sequence.length - 1; i++)
+        for (int i = 0; improvementCounter < max && i < this.Sequence.length - 1 && !data.isStopRequested(); i++)
             for (int j = i + 1; improvementCounter < max && j < this.Sequence.length ; j++) {
                 LocalSearchMove lsm = new _2Opt(data, i , j, this);
                 lsm.setGain(data);
@@ -255,19 +263,20 @@ public final class Route implements Comparable<Route>, AutoCloseable {
      * @param other    the other route to exchange stops with
      * @param solution the solution the routes belong to, or {@code null} when
      *                 no depot ships anything yet
-     * @return an improving feasible move, or {@code null} if none exists
+     * @return an improving feasible move, or {@code null} if none exists or a
+     *         stop was requested mid-scan
      */
     public LocalSearchMove getLSM(InputData data, Route other, Solution solution) {
         LocalSearchMove lsm;
         if (this.Depot.equals(other.Depot)) {
-            for (int i = 0; i < this.Sequence.length; i++)
+            for (int i = 0; i < this.Sequence.length && !data.isStopRequested(); i++)
                 for (int j = 0; j < other.Sequence.length ; j++) {
                     lsm = new _2Opt(data, i , j, this, other);
                     lsm.setGain(data);
                     if (lsm.getGain() < 0d && lsm.isFeasible(data, solution))
                         return lsm;
                 }
-            for (int i = 0; i < other.Sequence.length; i++)
+            for (int i = 0; i < other.Sequence.length && !data.isStopRequested(); i++)
                 for (int j = 0; j < this.Sequence.length ; j++) {
                     lsm = new _2Opt(data, i , j, other, this);
                     lsm.setGain(data);
@@ -275,7 +284,7 @@ public final class Route implements Comparable<Route>, AutoCloseable {
                         return lsm;
                 }
         }
-        for (int i = 0; i < this.Sequence.length; i++)
+        for (int i = 0; i < this.Sequence.length && !data.isStopRequested(); i++)
             for (int j = 0; j < other.Sequence.length ; j++) {
                 lsm = new Swap(data, i, j, this, other);
                 if (lsm.isFeasible(data, solution)) {
@@ -286,7 +295,7 @@ public final class Route implements Comparable<Route>, AutoCloseable {
             }
         int max1 = (int) Math.sqrt(this.Sequence.length);
         int max2 = (int) Math.sqrt(other.Sequence.length);
-        for (int i = 0; i < this.Sequence.length; i++)
+        for (int i = 0; i < this.Sequence.length && !data.isStopRequested(); i++)
             for (int j = 0; j < other.Sequence.length ; j++) {
                 for (int degree = j == i + 1 ? 1 : 0; degree <= max2 && j + degree < other.Sequence.length; degree++) {
                     lsm = new RightShift(data, true, degree, i, j, this, other);

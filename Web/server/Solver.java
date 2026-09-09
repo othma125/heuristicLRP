@@ -23,17 +23,20 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 /**
  * The solving endpoints. {@link #solve} runs the genetic algorithm on the
  * requested instance and streams its log live over Server-Sent Events, closing
  * with a {@code result} event carrying cost, time, gap, and routes;
- * {@link #stop} asks the run in progress to finish early.
+ * {@link #stop} asks one run to finish early.
  *
  * <p>Both methods match {@code HttpHandler}, so the server registers them as
- * method references. The run in progress is instance state, which is why this
- * class is instantiated rather than static.
+ * method references. Runs are keyed by the {@code run} id the client sends with
+ * both requests, so several browser tabs can solve at once and each one stops
+ * only its own run.
  *
  * @author Othmane EL YAAKOUBI
  */
@@ -43,11 +46,8 @@ final class Solver {
     /** One exported route line: {@code Route #3 (depot 1): 4 7 9}. */
     private static final Pattern ROUTE_LINE = Pattern.compile("Route #\\d+ \\(depot (\\d+)\\):(.*)");
 
-    // ponytail: one solve at a time — System.out is redirected globally to the
-    // SSE stream while solving. Per-session isolation only if concurrency matters.
-    private final Object lock = new Object();
-    /** The solver currently running, so {@link #stop} can ask it to stop early. */
-    private volatile GeneticAlgorithm current;
+    /** Runs in progress by client-supplied id, so {@link #stop} hits the right one. */
+    private final Map<String, GeneticAlgorithm> running = new ConcurrentHashMap<>();
 
     /**
      * SSE endpoint: streams the live solver log, then a final {@code result}
@@ -70,36 +70,34 @@ final class Solver {
             return;
         }
 
-        synchronized (this.lock) {
-            run(instance, out);
-        }
+        run(instance, out, Http.query(ex).getOrDefault("run", ""));
     }
 
     /**
-     * Asks the running solve to stop early.
+     * Asks the solve identified by the {@code run} query parameter to stop early.
+     * Unknown ids are ignored: the run has already finished.
      *
      * @param ex the HTTP exchange
      * @throws IOException when writing the response fails
      */
     void stop(HttpExchange ex) throws IOException {
-        GeneticAlgorithm algorithm = this.current;
+        GeneticAlgorithm algorithm = this.running.get(Http.query(ex).getOrDefault("run", ""));
         if (algorithm != null)
             algorithm.requestStop();
         Http.send(ex, 200, "text/plain", "stopping".getBytes(StandardCharsets.UTF_8));
     }
 
     /**
-     * Runs the genetic algorithm for the given instance while redirecting the
-     * process standard output to the SSE stream. Sends the final {@code result}
-     * event when the run completes or aborts.
+     * Runs the genetic algorithm for the given instance with its log wired to
+     * this client's SSE stream. Sends the final {@code result} event when the
+     * run completes or aborts.
      *
      * @param instance the VRP instance file to solve
      * @param out the output stream for the SSE connection
+     * @param id the client-supplied id identifying this run
      * @throws IOException when writing SSE events fails
      */
-    private void run(File instance, OutputStream out) throws IOException {
-        PrintStream original = System.out;
-        System.setOut(new PrintStream(new SseLineStream(out), true, StandardCharsets.UTF_8));
+    private void run(File instance, OutputStream out, String id) throws IOException {
         ScheduledExecutorService watchdog = Executors.newSingleThreadScheduledExecutor();
         // The solver only prints on improvement, so it can run silent for minutes and never
         // notice a closed tab. Ping instead: a failed write means nobody is listening.
@@ -107,7 +105,7 @@ final class Solver {
             try {
                 Http.sse(out, "ping", "");
             } catch (IOException hungUp) {
-                GeneticAlgorithm algorithm = this.current;
+                GeneticAlgorithm algorithm = this.running.get(id);
                 if (algorithm != null)
                     algorithm.requestStop();
             }
@@ -115,9 +113,9 @@ final class Solver {
         try {
             try (InputData data = new InputData(instance.getPath().replace("\\", "/"))) {
                 GeneticAlgorithm algo = new GeneticAlgorithm(data);
-                this.current = algo;
+                algo.Log = new PrintStream(new SseLineStream(out), true, StandardCharsets.UTF_8);
+                this.running.put(id, algo);
                 algo.Run();
-                System.setOut(original);
 
                 if (algo.isFeasible()) {
                     GiantTour gt = algo.getBestGiantTour();
@@ -130,12 +128,11 @@ final class Solver {
                 }
             }
         } catch (Exception e) {
-            System.setOut(original);
             Http.sse(out, "log", "ERROR: " + e.getMessage());
             Http.sse(out, "result", resultJson(false, 0, 0, "[]", Double.NaN));
         } finally {
             watchdog.shutdownNow();
-            this.current = null;
+            this.running.remove(id);
             out.close();
         }
     }

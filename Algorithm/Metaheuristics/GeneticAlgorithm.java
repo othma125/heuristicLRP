@@ -63,10 +63,10 @@ public class GeneticAlgorithm extends MetaHeuristic {
     @Override
     @SuppressWarnings("empty-statement")
     public void Run() {
-        System.out.println("File to solve = " + this.Data.FileName);
-        System.out.println("Customers = " + this.Data.getCustomerNumber() + ", depots = " + this.Data.getDepotNumber());
-        System.out.println("Solution approach = Memetic Algorithm");
-        System.out.println();
+        this.Log.println("File to solve = " + this.Data.FileName);
+        this.Log.println("Customers = " + this.Data.getCustomerNumber() + ", depots = " + this.Data.getDepotNumber());
+        this.Log.println("Solution approach = Memetic Algorithm");
+        this.Log.println();
         this.StartTime = System.currentTimeMillis();
         this.InitialPopulation();
         if(!this.Population[0].isFeasible())
@@ -74,7 +74,7 @@ public class GeneticAlgorithm extends MetaHeuristic {
         // requestStop() (e.g. a web Stop request) breaks out, keeping the best-so-far tour.
         while (!this.isStopRequested() && (this.runCrossovers() || this.nonStopCondition())) {}
         this.EndTime = System.currentTimeMillis() - this.StartTime;
-        System.out.println();
+        this.Log.println();
     }
 
     /**

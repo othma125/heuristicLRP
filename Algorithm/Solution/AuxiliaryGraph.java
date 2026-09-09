@@ -66,7 +66,7 @@ public class AuxiliaryGraph implements AutoCloseable {
         }
         this.phaser.arriveAndAwaitAdvance();
         if (this.isFeasible())
-            this.getLastNode().getParetoSet()
+            this.getLastNode().getSolutions()
                                 .stream()
                                 .forEach(s -> s.InterRoutesLocalSearch(data));
     }
@@ -93,17 +93,16 @@ public class AuxiliaryGraph implements AutoCloseable {
                     break;
                 }
             if (allMatch) 
-                Stream.of(node.getBestSolution(), node.getBestLeftOver())
-                    .distinct()
-                    .filter(solution -> solution.getTotalDistance() < this.Bound)
-                    .forEach(solution -> {
-                        for (int[] tour : this.Tours) {
-                            ArcSetter setter = new ArcSetter(this, node, solution, tour);
-                            this.ArcsSetters.add(setter);
-                            this.phaser.register();
-                            ForkJoinPool.commonPool().execute(setter);
-                        }
-                    });
+                node.getParetoSet().stream()
+                                    .filter(solution -> solution.getTotalDistance() < this.Bound)
+                                    .forEach(solution -> {
+                                        for (int[] tour : this.Tours) {
+                                            ArcSetter setter = new ArcSetter(this, node, solution, tour);
+                                            this.ArcsSetters.add(setter);
+                                            this.phaser.register();
+                                            ForkJoinPool.commonPool().execute(setter);
+                                        }
+                                    });
         } finally {
             node.Lock.unlock();
         }
