@@ -135,30 +135,34 @@ public class GeneticAlgorithm extends MetaHeuristic {
      * @return {@code true} if the incumbent was improved
      */
     private boolean Crossover() {
-        GiantTour parent1 = this.tournamentSelection();
-        GiantTour parent2 = this.tournamentSelection();
-        if (ThreadLocalRandom.current().nextDouble() < this.CrossoverRate && parent1 != parent2) {
-            GiantTour graph_crossover = new GiantTour(this.Data, parent1, parent2);
+        int index1 = this.tournamentSelection();
+        int index2 = this.tournamentSelection();
+        if (ThreadLocalRandom.current().nextDouble() < this.CrossoverRate && index1 != index2) {
+            GiantTour graph_crossover = new GiantTour(this.Data, this.Population[index1], this.Population[index2]);
             return this.UpdatePopulation(graph_crossover);
         }
-        else if (parent1 == parent2) {
+        else if (index1 == index2) {
             GiantTour random = new GiantTour(this.Data, false);
-            GiantTour graph_crossover = new GiantTour(this.Data, parent1, random);
+            GiantTour graph_crossover = new GiantTour(this.Data, this.Population[index1], random);
             return this.UpdatePopulation(graph_crossover); 
         }
         else {
-            // repeat splitting procedure to discover more improvement possibilities
+            // repeat splitting procedure to discover more improvement possibilities;
+            // a parent whose re-split fails is swapped for a fresh random tour
+            GiantTour parent1 = this.Population[index1];
+            GiantTour parent2 = this.Population[index2];
             boolean c1 = parent1.Split(this.Data);
             if (c1)
                 this.setBestSolution(parent1);
+            else if (parent1 != this.getBestGiantTour() && this.Population[index1] == parent1)
+                this.Population[index1] = new GiantTour(this.Data);
             boolean c2 = parent2.Split(this.Data);
             if (c2)
                 this.setBestSolution(parent2);
-            if (c1 || c2) {
-                this.sortPopulation();
-                return true;
-            }
-            return false;
+            else if (parent2 != this.getBestGiantTour() && this.Population[index2] == parent2)
+                this.Population[index2] = new GiantTour(this.Data);
+            this.sortPopulation();
+            return c1 || c2;
         }
     }
     
@@ -228,16 +232,16 @@ public class GeneticAlgorithm extends MetaHeuristic {
     /**
      * Picks the fittest of {@code TournamentSize} randomly drawn individuals.
      *
-     * @return the tournament winner
+     * @return the population index of the tournament winner
      */
-    private GiantTour tournamentSelection() {
-        GiantTour bestInTournament = null;
+    private int tournamentSelection() {
+        int bestIndex = -1;
         for (int i = 0; i < this.TournamentSize; i++) {
-            GiantTour randomCompetitor = this.Population[ThreadLocalRandom.current().nextInt(this.PopulationSize)];
-            if (bestInTournament == null || randomCompetitor.getFitness() < bestInTournament.getFitness())
-                bestInTournament = randomCompetitor;
+            int competitor = ThreadLocalRandom.current().nextInt(this.PopulationSize);
+            if (bestIndex < 0 || this.Population[competitor].getFitness() < this.Population[bestIndex].getFitness())
+                bestIndex = competitor;
         }
-        return bestInTournament;
+        return bestIndex;
     }
     
     /**
