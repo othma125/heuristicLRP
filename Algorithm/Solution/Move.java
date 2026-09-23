@@ -11,10 +11,10 @@ package Algorithm.Solution;
  * @author Othmane EL YAAKOUBI
  */
 public class Move {
-    private int Index1, Index2;
+    private int index1, index2;
 
 //    void display(){
-//        System.out.println("( " + this.Index1 + " , " + this.Index2 + " )");
+//        System.out.println("( " + this.index1 + " , " + this.index2 + " )");
 //    }
 
     /**
@@ -22,65 +22,65 @@ public class Move {
      * @param b the second index
      */
     public Move(int a, int b) {
-        this.Index1 = a;
-        this.Index2 = b;
+        this.index1 = a;
+        this.index2 = b;
     }
 
 //    boolean EqualsTo(Move m) {
-//        return (this.Index1 == m.Index2 && this.Index2 == m.Index1) || (this.Index1 == m.Index1 && this.Index2 == m.Index2);
+//        return (this.index1 == m.index2 && this.index2 == m.index1) || (this.index1 == m.index1 && this.index2 == m.index2);
 //    }
 
     /**
-     * Moves the element at {@code Index2} to {@code Index1}, shifting the
+     * Moves the element at {@code index2} to {@code index1}, shifting the
      * elements in between one position to the right.
      *
      * @param sequence the sequence to modify in place
      */
-    public void RightShift(int[] sequence) {
-        if (this.Index1 < this.Index2) {
-            int aux = sequence[this.Index2];
-            for (int k = this.Index2; k > this.Index1;)
+    public void rightShift(int[] sequence) {
+        if (this.index1 < this.index2) {
+            int aux = sequence[this.index2];
+            for (int k = this.index2; k > this.index1;)
                 sequence[k] = sequence[--k];
-            sequence[this.Index1] = aux;
+            sequence[this.index1] = aux;
         }
     }
     
     /**
-     * Moves the element at {@code Index1} to {@code Index2}, shifting the
+     * Moves the element at {@code index1} to {@code index2}, shifting the
      * elements in between one position to the left.
      *
      * @param array the sequence to modify in place
      */
-    public void LeftShift(int[] array){
-        if(this.Index1 < this.Index2){
-            int aux = array[this.Index1];
-            for(int k = this.Index1; k < this.Index2;)
+    public void leftShift(int[] array){
+        if(this.index1 < this.index2){
+            int aux = array[this.index1];
+            for(int k = this.index1; k < this.index2;)
                 array[k] = array[++k];
-            array[this.Index2] = aux;
+            array[this.index2] = aux;
         }
     }
 
     /**
-     * Swaps the elements at {@code Index1} and {@code Index2}.
+     * Swaps the elements at {@code index1} and {@code index2}.
      *
      * @param array the sequence to modify in place
      */
-    public void Swap(int[] array){
-       int aux = array[this.Index1];
-       array[this.Index1] = array[this.Index2];
-       array[this.Index2] = aux;
+    public void swap(int[] array){
+       int aux = array[this.index1];
+       array[this.index1] = array[this.index2];
+       array[this.index2] = aux;
     }
 
     /**
-     * Reverses the segment between {@code Index1} and {@code Index2} inclusive
+     * Reverses the segment between {@code index1} and {@code index2} inclusive
      * (the 2-opt array operation).
      *
      * @param array the sequence to modify in place
      */
     public void _2Opt(int[] array) {
-        if (this.Index1 < this.Index2) {
-            for (int k = this.Index1, l = this.Index2; k < l; k++, l--)
-                new Move(k, l).Swap(array);
+        if (this.index1 < this.index2) {
+            for (int k = this.index1, l = this.index2; k < l; k++, l--)
+                new Move(k, l).swap(array);
         }
     }
 }

@@ -7,8 +7,8 @@ import Algorithm.Solution.Route;
 import Algorithm.Solution.Solution;
 
 /**
- * Right-shift (or-opt) move: relocates a block of {@code Degree + 1} stops
- * starting at position {@code J} of the second route into position {@code I} of
+ * Right-shift (or-opt) move: relocates a block of {@code degree + 1} stops
+ * starting at position {@code j} of the second route into position {@code i} of
  * the first (or the same) route. The {@code with2Opt} flag reverses the
  * relocated block. It is the mirror image of {@link LeftShift}, so the block
  * may likewise cross over to the first route's depot.
@@ -17,7 +17,7 @@ import Algorithm.Solution.Solution;
  */
 public class RightShift extends LocalSearchMove {
 
-    private final int Degree;
+    private final int degree;
     private final boolean with2Opt;
 
     /**
@@ -32,74 +32,74 @@ public class RightShift extends LocalSearchMove {
     public RightShift(InputData data, boolean with2opt, int degree, int i, int j, Route... routes) {
         super("RightShift", i, j, routes);
         this.with2Opt = with2opt;
-        this.Degree = degree;
+        this.degree = degree;
     }
 
     /** {@inheritDoc} */
     @Override
     public void setGain(InputData data) {
         if (this.with2Opt) {
-            this.Gain += data.getTwoStopsDistance(this.SecondRoute.getStop(this.J), this.FirstRoute.getStop(this.I));
-            if (this.I == 0) {
-                this.Gain += data.getDepotToStopDistance(this.FirstRoute.getDepot(), this.SecondRoute.getStop(this.J + this.Degree));
-                this.Gain -= data.getDepotToStopDistance(this.FirstRoute.getDepot(), this.FirstRoute.getStop(this.I));
+            this.gain += data.getTwoStopsDistance(this.secondRoute.getStop(this.j), this.firstRoute.getStop(this.i));
+            if (this.i == 0) {
+                this.gain += data.getDepotToStopDistance(this.firstRoute.getDepot(), this.secondRoute.getStop(this.j + this.degree));
+                this.gain -= data.getDepotToStopDistance(this.firstRoute.getDepot(), this.firstRoute.getStop(this.i));
             }
             else {
-                this.Gain += data.getTwoStopsDistance(this.FirstRoute.getStop(this.I - 1), this.SecondRoute.getStop(this.J + this.Degree));
-                this.Gain -= data.getTwoStopsDistance(this.FirstRoute.getStop(this.I - 1), this.FirstRoute.getStop(this.I));
+                this.gain += data.getTwoStopsDistance(this.firstRoute.getStop(this.i - 1), this.secondRoute.getStop(this.j + this.degree));
+                this.gain -= data.getTwoStopsDistance(this.firstRoute.getStop(this.i - 1), this.firstRoute.getStop(this.i));
             }
         }
         else {
-            this.Gain += data.getTwoStopsDistance(this.SecondRoute.getStop(this.J + this.Degree), this.FirstRoute.getStop(this.I));
-            if (this.I == 0) {
-                this.Gain += data.getDepotToStopDistance(this.FirstRoute.getDepot(), this.SecondRoute.getStop(this.J));
-                this.Gain -= data.getDepotToStopDistance(this.FirstRoute.getDepot(), this.FirstRoute.getStop(this.I));
+            this.gain += data.getTwoStopsDistance(this.secondRoute.getStop(this.j + this.degree), this.firstRoute.getStop(this.i));
+            if (this.i == 0) {
+                this.gain += data.getDepotToStopDistance(this.firstRoute.getDepot(), this.secondRoute.getStop(this.j));
+                this.gain -= data.getDepotToStopDistance(this.firstRoute.getDepot(), this.firstRoute.getStop(this.i));
             }
             else {
-                this.Gain += data.getTwoStopsDistance(this.FirstRoute.getStop(this.I - 1), this.SecondRoute.getStop(this.J));
-                this.Gain -= data.getTwoStopsDistance(this.FirstRoute.getStop(this.I - 1), this.FirstRoute.getStop(this.I));
+                this.gain += data.getTwoStopsDistance(this.firstRoute.getStop(this.i - 1), this.secondRoute.getStop(this.j));
+                this.gain -= data.getTwoStopsDistance(this.firstRoute.getStop(this.i - 1), this.firstRoute.getStop(this.i));
             }
         }
         // Closing the hole the block leaves behind happens inside the second route, so those
         // legs are measured from the second route's depot.
-        if (this.J > 0 || this.OneSequence)
-            this.Gain -= data.getTwoStopsDistance(this.SecondRoute.getStop(this.J - 1), this.SecondRoute.getStop(this.J));
+        if (this.j > 0 || this.oneSequence)
+            this.gain -= data.getTwoStopsDistance(this.secondRoute.getStop(this.j - 1), this.secondRoute.getStop(this.j));
         else
-            this.Gain -= data.getDepotToStopDistance(this.SecondRoute.getDepot(), this.SecondRoute.getStop(this.J));
-        if (this.J + this.Degree + 1 < this.Border) {
-            if (this.J > 0 || this.OneSequence)
-                this.Gain += data.getTwoStopsDistance(this.SecondRoute.getStop(this.J - 1), this.SecondRoute.getStop(this.J + this.Degree + 1));
+            this.gain -= data.getDepotToStopDistance(this.secondRoute.getDepot(), this.secondRoute.getStop(this.j));
+        if (this.j + this.degree + 1 < this.border) {
+            if (this.j > 0 || this.oneSequence)
+                this.gain += data.getTwoStopsDistance(this.secondRoute.getStop(this.j - 1), this.secondRoute.getStop(this.j + this.degree + 1));
             else
-                this.Gain += data.getDepotToStopDistance(this.SecondRoute.getDepot(), this.SecondRoute.getStop(this.J + this.Degree + 1));
-            this.Gain -= data.getTwoStopsDistance(this.SecondRoute.getStop(this.J + this.Degree), this.SecondRoute.getStop(this.J + this.Degree + 1));
+                this.gain += data.getDepotToStopDistance(this.secondRoute.getDepot(), this.secondRoute.getStop(this.j + this.degree + 1));
+            this.gain -= data.getTwoStopsDistance(this.secondRoute.getStop(this.j + this.degree), this.secondRoute.getStop(this.j + this.degree + 1));
         }
         else {
-            if (this.J > 0 || this.OneSequence)
-                this.Gain += data.getStopToDepotDistance(this.SecondRoute.getStop(this.J - 1), this.SecondRoute.getDepot());
-            this.Gain -= data.getStopToDepotDistance(this.SecondRoute.getStop(this.J + this.Degree), this.SecondRoute.getDepot());
+            if (this.j > 0 || this.oneSequence)
+                this.gain += data.getStopToDepotDistance(this.secondRoute.getStop(this.j - 1), this.secondRoute.getDepot());
+            this.gain -= data.getStopToDepotDistance(this.secondRoute.getStop(this.j + this.degree), this.secondRoute.getDepot());
         }
     }
 
     /** {@inheritDoc} */
     @Override
-    public void Perform(InputData data) {
-        if (this.OneSequence) {
-            this.FirstRoute.RightShift(this.I, this.J, this.Degree, this.with2Opt);
-            this.FirstRoute.Improve(this.Gain);
+    public void perform(InputData data) {
+        if (this.oneSequence) {
+            this.firstRoute.rightShift(this.i, this.j, this.degree, this.with2Opt);
+            this.firstRoute.improve(this.gain);
         }
         else {
-            int[] seq1 = new int[this.FirstRoute.getLength() + this.Degree + 1];
-            for (int i = 0; i < this.I; i++) 
-                seq1[i] = this.FirstRoute.getStop(i);
-            for (int i = 0; i <= this.Degree; i++) 
-                seq1[this.I + i] = this.SecondRoute.getStop(this.with2Opt ? this.J + this.Degree - i : this.J + i);
-            for (int i = this.I; i < this.FirstRoute.getLength(); i++) 
-                seq1[i + this.Degree + 1] = this.FirstRoute.getStop(i);
-            int[] seq2 = new int[this.SecondRoute.getLength() - this.Degree - 1];
-            for (int i = 0; i < this.J; i++) 
-                seq2[i] = this.SecondRoute.getStop(i);
-            for (int i = this.J + this.Degree + 1; i < this.SecondRoute.getLength(); i++) 
-                seq2[i - this.Degree - 1] = this.SecondRoute.getStop(i);
+            int[] seq1 = new int[this.firstRoute.getLength() + this.degree + 1];
+            for (int i = 0; i < this.i; i++) 
+                seq1[i] = this.firstRoute.getStop(i);
+            for (int i = 0; i <= this.degree; i++) 
+                seq1[this.i + i] = this.secondRoute.getStop(this.with2Opt ? this.j + this.degree - i : this.j + i);
+            for (int i = this.i; i < this.firstRoute.getLength(); i++) 
+                seq1[i + this.degree + 1] = this.firstRoute.getStop(i);
+            int[] seq2 = new int[this.secondRoute.getLength() - this.degree - 1];
+            for (int i = 0; i < this.j; i++) 
+                seq2[i] = this.secondRoute.getStop(i);
+            for (int i = this.j + this.degree + 1; i < this.secondRoute.getLength(); i++) 
+                seq2[i - this.degree - 1] = this.secondRoute.getStop(i);
             this.rebuild(data, seq1, seq2);
         }
     }
@@ -107,27 +107,27 @@ public class RightShift extends LocalSearchMove {
     /** {@inheritDoc} */
     @Override
     public boolean isFeasible(InputData data, Solution solution) {
-        if (this.OneSequence)
+        if (this.oneSequence)
             return true;
-        int sum_demand = 0;
-        for (int i = this.J; i <= this.J + this.Degree; i++) 
-            sum_demand += data.getDemand(this.SecondRoute.getStop(i));
-        int demand1 = this.FirstRoute.getSumDemand() + sum_demand;
-        int demand2 = this.SecondRoute.getSumDemand() - sum_demand;
+        int sumDemand = 0;
+        for (int i = this.j; i <= this.j + this.degree; i++) 
+            sumDemand += data.getDemand(this.secondRoute.getStop(i));
+        int demand1 = this.firstRoute.getSumDemand() + sumDemand;
+        int demand2 = this.secondRoute.getSumDemand() - sumDemand;
         if (demand1 > data.getCapacity() || demand2 > data.getCapacity())
             return false;
         // Only the first route's depot takes demand on; the second one frees some, and
         // frees all of it when the block is the whole route and the route goes away.
-        return this.hasRoom(solution, this.FirstRoute, demand1)
-               && (this.Border > this.Degree + 1 || this.keepsDepotPaid(solution, this.SecondRoute));
+        return this.hasRoom(solution, this.firstRoute, demand1)
+               && (this.border > this.degree + 1 || this.keepsDepotPaid(solution, this.secondRoute));
     }
 
     @Override
     public String toString() {
-        if (this.Degree == 0)
-            return this.Name + " (" + this.I + ";" + this.J + ")";
+        if (this.degree == 0)
+            return this.name + " (" + this.i + ";" + this.j + ")";
         else if (this.with2Opt)
-            return this.Name + " (" + this.I + ";" + this.J + ") " + -this.Degree;
-        return this.Name + " (" + this.I + ";" + this.J + ") " + this.Degree;
+            return this.name + " (" + this.i + ";" + this.j + ") " + -this.degree;
+        return this.name + " (" + this.i + ";" + this.j + ") " + this.degree;
     }
 }

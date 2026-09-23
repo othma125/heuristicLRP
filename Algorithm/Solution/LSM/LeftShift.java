@@ -7,8 +7,8 @@ import Algorithm.Solution.Route;
 import Algorithm.Solution.Solution;
 
 /**
- * Left-shift (or-opt) move: relocates a block of {@code Degree + 1} stops
- * ending at position {@code I} of the first route to position {@code J} of the
+ * Left-shift (or-opt) move: relocates a block of {@code degree + 1} stops
+ * ending at position {@code i} of the first route to position {@code j} of the
  * second (or the same) route. The {@code with2Opt} flag reverses the relocated
  * block. The two routes may serve different depots, in which case the block is
  * handed over to the second route's depot.
@@ -17,8 +17,8 @@ import Algorithm.Solution.Solution;
  */
 public class LeftShift extends LocalSearchMove {
 
-    private final int FirstBorder;
-    private final int Degree;
+    private final int firstBorder;
+    private final int degree;
     private final boolean with2Opt;
 
     /**
@@ -33,8 +33,8 @@ public class LeftShift extends LocalSearchMove {
     public LeftShift(InputData data, boolean with2opt, int degree, int i, int j, Route... routes) {
         super("LeftShift", i, j, routes);
         this.with2Opt = with2opt;
-        this.Degree = degree;
-        this.FirstBorder = this.FirstRoute.getLength();
+        this.degree = degree;
+        this.firstBorder = this.firstRoute.getLength();
     }
 
     /** {@inheritDoc} */
@@ -42,78 +42,78 @@ public class LeftShift extends LocalSearchMove {
     public void setGain(InputData data) {
         // The relocated block joins the second route, so every leg it opens or closes on that
         // side is measured from the second route's depot.
-        if (this.Border == 0) {
+        if (this.border == 0) {
             if (this.with2Opt) {
-                this.Gain += data.getDepotToStopDistance(this.SecondRoute.getDepot(), this.FirstRoute.getStop(this.I));
-                this.Gain += data.getStopToDepotDistance(this.FirstRoute.getStop(this.I - this.Degree), this.SecondRoute.getDepot());
+                this.gain += data.getDepotToStopDistance(this.secondRoute.getDepot(), this.firstRoute.getStop(this.i));
+                this.gain += data.getStopToDepotDistance(this.firstRoute.getStop(this.i - this.degree), this.secondRoute.getDepot());
             }
             else {
-                this.Gain += data.getStopToDepotDistance(this.FirstRoute.getStop(this.I), this.SecondRoute.getDepot());
-                this.Gain += data.getDepotToStopDistance(this.SecondRoute.getDepot(), this.FirstRoute.getStop(this.I - this.Degree));
+                this.gain += data.getStopToDepotDistance(this.firstRoute.getStop(this.i), this.secondRoute.getDepot());
+                this.gain += data.getDepotToStopDistance(this.secondRoute.getDepot(), this.firstRoute.getStop(this.i - this.degree));
             }
         }
         else if (this.with2Opt) {
-            this.Gain += data.getTwoStopsDistance(this.SecondRoute.getStop(this.J), this.FirstRoute.getStop(this.I));
-            if (this.J + 1 < this.Border) {
-                this.Gain += data.getTwoStopsDistance(this.FirstRoute.getStop(this.I - this.Degree), this.SecondRoute.getStop(this.J + 1));
-                this.Gain -= data.getTwoStopsDistance(this.SecondRoute.getStop(this.J), this.SecondRoute.getStop(this.J + 1));
+            this.gain += data.getTwoStopsDistance(this.secondRoute.getStop(this.j), this.firstRoute.getStop(this.i));
+            if (this.j + 1 < this.border) {
+                this.gain += data.getTwoStopsDistance(this.firstRoute.getStop(this.i - this.degree), this.secondRoute.getStop(this.j + 1));
+                this.gain -= data.getTwoStopsDistance(this.secondRoute.getStop(this.j), this.secondRoute.getStop(this.j + 1));
             }
             else {
-                this.Gain += data.getStopToDepotDistance(this.FirstRoute.getStop(this.I - this.Degree), this.SecondRoute.getDepot());
-                this.Gain -= data.getStopToDepotDistance(this.SecondRoute.getStop(this.J), this.SecondRoute.getDepot());
+                this.gain += data.getStopToDepotDistance(this.firstRoute.getStop(this.i - this.degree), this.secondRoute.getDepot());
+                this.gain -= data.getStopToDepotDistance(this.secondRoute.getStop(this.j), this.secondRoute.getDepot());
             }
         }
         else {
-            this.Gain += data.getTwoStopsDistance(this.SecondRoute.getStop(this.J), this.FirstRoute.getStop(this.I - this.Degree));
-            if (this.J + 1 < this.Border) {
-                this.Gain += data.getTwoStopsDistance(this.FirstRoute.getStop(this.I), this.SecondRoute.getStop(this.J + 1));
-                this.Gain -= data.getTwoStopsDistance(this.SecondRoute.getStop(this.J), this.SecondRoute.getStop(this.J + 1));
+            this.gain += data.getTwoStopsDistance(this.secondRoute.getStop(this.j), this.firstRoute.getStop(this.i - this.degree));
+            if (this.j + 1 < this.border) {
+                this.gain += data.getTwoStopsDistance(this.firstRoute.getStop(this.i), this.secondRoute.getStop(this.j + 1));
+                this.gain -= data.getTwoStopsDistance(this.secondRoute.getStop(this.j), this.secondRoute.getStop(this.j + 1));
             }
             else {
-                this.Gain += data.getStopToDepotDistance(this.FirstRoute.getStop(this.I), this.SecondRoute.getDepot());
-                this.Gain -= data.getStopToDepotDistance(this.SecondRoute.getStop(this.J), this.SecondRoute.getDepot());
+                this.gain += data.getStopToDepotDistance(this.firstRoute.getStop(this.i), this.secondRoute.getDepot());
+                this.gain -= data.getStopToDepotDistance(this.secondRoute.getStop(this.j), this.secondRoute.getDepot());
             }
         }
-        if (this.I + 1 < this.FirstBorder || this.OneSequence)
-            this.Gain -= data.getTwoStopsDistance(this.FirstRoute.getStop(this.I), this.FirstRoute.getStop(this.I + 1));
+        if (this.i + 1 < this.firstBorder || this.oneSequence)
+            this.gain -= data.getTwoStopsDistance(this.firstRoute.getStop(this.i), this.firstRoute.getStop(this.i + 1));
         else
-            this.Gain -= data.getStopToDepotDistance(this.FirstRoute.getStop(this.I), this.FirstRoute.getDepot());
-        if (this.I - this.Degree == 0) {
-            if (this.I + 1 < this.FirstBorder || this.OneSequence)
-                this.Gain += data.getDepotToStopDistance(this.FirstRoute.getDepot(), this.FirstRoute.getStop(this.I + 1));
-            this.Gain -= data.getDepotToStopDistance(this.FirstRoute.getDepot(), this.FirstRoute.getStop(this.I - this.Degree));
+            this.gain -= data.getStopToDepotDistance(this.firstRoute.getStop(this.i), this.firstRoute.getDepot());
+        if (this.i - this.degree == 0) {
+            if (this.i + 1 < this.firstBorder || this.oneSequence)
+                this.gain += data.getDepotToStopDistance(this.firstRoute.getDepot(), this.firstRoute.getStop(this.i + 1));
+            this.gain -= data.getDepotToStopDistance(this.firstRoute.getDepot(), this.firstRoute.getStop(this.i - this.degree));
         } 
         else {
-            if (this.I + 1 < this.FirstBorder || this.OneSequence)
-                this.Gain += data.getTwoStopsDistance(this.FirstRoute.getStop(this.I - this.Degree - 1), this.FirstRoute.getStop(this.I + 1));
+            if (this.i + 1 < this.firstBorder || this.oneSequence)
+                this.gain += data.getTwoStopsDistance(this.firstRoute.getStop(this.i - this.degree - 1), this.firstRoute.getStop(this.i + 1));
             else
-                this.Gain += data.getStopToDepotDistance(this.FirstRoute.getStop(this.I - this.Degree - 1), this.FirstRoute.getDepot());
-            this.Gain -= data.getTwoStopsDistance(this.FirstRoute.getStop(this.I - this.Degree - 1), this.FirstRoute.getStop(this.I - this.Degree));
+                this.gain += data.getStopToDepotDistance(this.firstRoute.getStop(this.i - this.degree - 1), this.firstRoute.getDepot());
+            this.gain -= data.getTwoStopsDistance(this.firstRoute.getStop(this.i - this.degree - 1), this.firstRoute.getStop(this.i - this.degree));
         }
     }
 
     /** {@inheritDoc} */
     @Override
-    public void Perform(InputData data) {
-        if (this.OneSequence) {
-            this.FirstRoute.LeftShift(this.I, this.J, this.Degree, this.with2Opt);
-            this.FirstRoute.Improve(this.Gain);
+    public void perform(InputData data) {
+        if (this.oneSequence) {
+            this.firstRoute.leftShift(this.i, this.j, this.degree, this.with2Opt);
+            this.firstRoute.improve(this.gain);
         }
         else {
-            int[] seq1 = new int[this.FirstRoute.getLength() - this.Degree - 1];
-            for (int i = 0; i < this.I - this.Degree; i++) 
-                seq1[i] = this.FirstRoute.getStop(i);
-            for (int i = this.I + 1; i < this.FirstRoute.getLength(); i++) 
-                seq1[i - this.Degree - 1] = this.FirstRoute.getStop(i);
-            int[] seq2 = new int[this.SecondRoute.getLength() + this.Degree + 1];
-            if (this.SecondRoute.getLength() > 0) {
-                for (int i = 0; i <= this.J; i++) 
-                    seq2[i] = this.SecondRoute.getStop(i);
-                for (int i = this.J + 1; i < this.SecondRoute.getLength(); i++) 
-                    seq2[i + this.Degree + 1] = this.SecondRoute.getStop(i);
+            int[] seq1 = new int[this.firstRoute.getLength() - this.degree - 1];
+            for (int i = 0; i < this.i - this.degree; i++) 
+                seq1[i] = this.firstRoute.getStop(i);
+            for (int i = this.i + 1; i < this.firstRoute.getLength(); i++) 
+                seq1[i - this.degree - 1] = this.firstRoute.getStop(i);
+            int[] seq2 = new int[this.secondRoute.getLength() + this.degree + 1];
+            if (this.secondRoute.getLength() > 0) {
+                for (int i = 0; i <= this.j; i++) 
+                    seq2[i] = this.secondRoute.getStop(i);
+                for (int i = this.j + 1; i < this.secondRoute.getLength(); i++) 
+                    seq2[i + this.degree + 1] = this.secondRoute.getStop(i);
             }
-            for (int i = 0; i <= this.Degree; i++) 
-                seq2[this.SecondRoute.getLength() > 0 ? this.J + 1 + i : i] = this.FirstRoute.getStop(this.with2Opt ? this.I - i : this.I - this.Degree + i);
+            for (int i = 0; i <= this.degree; i++) 
+                seq2[this.secondRoute.getLength() > 0 ? this.j + 1 + i : i] = this.firstRoute.getStop(this.with2Opt ? this.i - i : this.i - this.degree + i);
             this.rebuild(data, seq1, seq2);
         }
     }
@@ -121,27 +121,27 @@ public class LeftShift extends LocalSearchMove {
     /** {@inheritDoc} */
     @Override
     public boolean isFeasible(InputData data, Solution solution) {
-        if (this.OneSequence)
+        if (this.oneSequence)
             return true;
-        int sum_demand = 0;
-        for (int i = this.I - this.Degree; i <= this.I; i++) 
-            sum_demand += data.getDemand(this.FirstRoute.getStop(i));
-        int demand1 = this.FirstRoute.getSumDemand() - sum_demand;
-        int demand2 = this.SecondRoute.getSumDemand() + sum_demand;
+        int sumDemand = 0;
+        for (int i = this.i - this.degree; i <= this.i; i++) 
+            sumDemand += data.getDemand(this.firstRoute.getStop(i));
+        int demand1 = this.firstRoute.getSumDemand() - sumDemand;
+        int demand2 = this.secondRoute.getSumDemand() + sumDemand;
         if (demand1 > data.getCapacity() || demand2 > data.getCapacity())
             return false;
         // Only the second route's depot takes demand on; the first one frees some, and
         // frees all of it when the block is the whole route and the route goes away.
-        return this.hasRoom(solution, this.SecondRoute, demand2)
-               && (this.FirstBorder > this.Degree + 1 || this.keepsDepotPaid(solution, this.FirstRoute));
+        return this.hasRoom(solution, this.secondRoute, demand2)
+               && (this.firstBorder > this.degree + 1 || this.keepsDepotPaid(solution, this.firstRoute));
     }
 
     @Override
     public String toString() {
-        if (this.Degree == 0)
-            return this.Name + " (" + this.I + ";" + this.J + ")";
+        if (this.degree == 0)
+            return this.name + " (" + this.i + ";" + this.j + ")";
         else if (this.with2Opt)
-            return this.Name + " (" + this.I + ";" + this.J + ") " + -this.Degree;
-        return this.Name + " (" + this.I + ";" + this.J + ") " + this.Degree;
+            return this.name + " (" + this.i + ";" + this.j + ") " + -this.degree;
+        return this.name + " (" + this.i + ";" + this.j + ") " + this.degree;
     }
 }

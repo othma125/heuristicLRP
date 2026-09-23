@@ -32,26 +32,26 @@ public final class Solution implements Comparable<Solution>, AutoCloseable {
     // ponytail: recursion with a cap, turn it into a loop if the cap starts costing gains
     private static final int MIN_LOCAL_SEARCH_PASSES = 10;
 
-    private final Map<Depot, List<Route>> Routes;
+    private final Map<Depot, List<Route>> routes;
     // The demand each opened depot already ships, kept in step with the routes so that
     // checking whether a depot can take more stops stays a lookup instead of a scan.
-    private final Map<Depot, Integer> DepotLoads;
-    private final BitSet Stops;
-    private double TotalDistance;
+    private final Map<Depot, Integer> depotLoads;
+    private final BitSet stops;
+    private double totalDistance;
     // The total unused capacity across opened depots, kept in step with the routes. It is
     // the solution's second objective, minimised alongside the cost: a solution that packs
     // its depots tightly has paid fewer opening costs for the demand it ships.
-    private int LeftoverLoad;
+    private int leftoverLoad;
 
     /**
      * @param distance the initial total travelled distance
      * @param capacity the expected number of routes, used to size the backing map
      */
     Solution(double distance, int capacity) {
-        this.TotalDistance = distance;
-        this.Routes = new LinkedHashMap<>(capacity, 1f);
-        this.DepotLoads = new LinkedHashMap<>(capacity, 1f);
-        this.Stops = new BitSet();
+        this.totalDistance = distance;
+        this.routes = new LinkedHashMap<>(capacity, 1f);
+        this.depotLoads = new LinkedHashMap<>(capacity, 1f);
+        this.stops = new BitSet();
     }
 
     /**
@@ -72,8 +72,8 @@ public final class Solution implements Comparable<Solution>, AutoCloseable {
      *
      * @param data the problem instance providing distances and capacity
      */
-    void InterRoutesLocalSearch(InputData data) {
-        this.InterRoutesLocalSearch(data, Math.max(MIN_LOCAL_SEARCH_PASSES, (int) Math.sqrt(this.getRoutesCount())));
+    void interRoutesLocalSearch(InputData data) {
+        this.interRoutesLocalSearch(data, Math.max(MIN_LOCAL_SEARCH_PASSES, (int) Math.sqrt(this.getRoutesCount())));
     }
 
     /**
@@ -81,7 +81,7 @@ public final class Solution implements Comparable<Solution>, AutoCloseable {
      * @param passes the number of moves still allowed; the descent also ends as
      *        soon as a stop is requested
      */
-    private void InterRoutesLocalSearch(InputData data, int passes) {
+    private void interRoutesLocalSearch(InputData data, int passes) {
         // A stop ends the descent here, keeping the improvements already applied.
         if (passes == 0 || data.isStopRequested())
             return;
@@ -94,20 +94,20 @@ public final class Solution implements Comparable<Solution>, AutoCloseable {
                 if (r1 != r2) {
                     LocalSearchMove lsm = r1.getLSM(data, r2, this);
                     if (lsm != null) {
-                        lsm.Perform(data);
+                        lsm.perform(data);
                         this.remove(r1);
-                        this.TotalDistance -= r1.getTraveledDistance();
+                        this.totalDistance -= r1.getTraveledDistance();
                         this.remove(r2);
-                        this.TotalDistance -= r2.getTraveledDistance();
+                        this.totalDistance -= r2.getTraveledDistance();
                         if (lsm.getFirstRoute() != null) {
                             this.add(lsm.getFirstRoute());
-                            this.TotalDistance += lsm.getFirstRoute().getTraveledDistance();
+                            this.totalDistance += lsm.getFirstRoute().getTraveledDistance();
                         }
                         if (lsm.getSecondRoute() != null) {
                             this.add(lsm.getSecondRoute());
-                            this.TotalDistance += lsm.getSecondRoute().getTraveledDistance();
+                            this.totalDistance += lsm.getSecondRoute().getTraveledDistance();
                         }
-                        this.InterRoutesLocalSearch(data, passes - 1);
+                        this.interRoutesLocalSearch(data, passes - 1);
                         return;
                     }
                 }
@@ -119,24 +119,24 @@ public final class Solution implements Comparable<Solution>, AutoCloseable {
      * @return {@code true} if the stop is already served by this solution
      */
     boolean contains(int stop) {
-        return this.Stops.get(stop);
+        return this.stops.get(stop);
     }
 
     /**
      * Adds a route to the solution, under the depot serving it, and registers
      * all of its stops as served.
      *
-     * @param new_route the route to add
+     * @param newRoute the route to add
      */
-    void add(Route new_route) {
-        this.Routes.computeIfAbsent(new_route.getDepot(), depot -> new LinkedList<>()).add(new_route);
-        int oldLeftover = this.DepotLoads.containsKey(new_route.getDepot())
-            ? this.getLeftOver(new_route.getDepot())
+    void add(Route newRoute) {
+        this.routes.computeIfAbsent(newRoute.getDepot(), depot -> new LinkedList<>()).add(newRoute);
+        int oldLeftover = this.depotLoads.containsKey(newRoute.getDepot())
+            ? this.getLeftOver(newRoute.getDepot())
             : 0;
-        this.DepotLoads.merge(new_route.getDepot(), new_route.getSumDemand(), Integer::sum);
-        this.LeftoverLoad += this.getLeftOver(new_route.getDepot()) - oldLeftover;
-        for (int stop : new_route.getSequence())
-            this.Stops.set(stop);
+        this.depotLoads.merge(newRoute.getDepot(), newRoute.getSumDemand(), Integer::sum);
+        this.leftoverLoad += this.getLeftOver(newRoute.getDepot()) - oldLeftover;
+        for (int stop : newRoute.getSequence())
+            this.stops.set(stop);
     }
 
     /**
@@ -144,7 +144,7 @@ public final class Solution implements Comparable<Solution>, AutoCloseable {
      * @return the demand this solution already ships from that depot
      */
     int getDepotLoad(Depot depot) {
-        return this.DepotLoads.getOrDefault(depot, 0);
+        return this.depotLoads.getOrDefault(depot, 0);
     }
 
     /**
@@ -190,7 +190,7 @@ public final class Solution implements Comparable<Solution>, AutoCloseable {
      * @return the total unused capacity across the depots this solution opens
      */
     int getLeftoverLoad() {
-        return this.LeftoverLoad;
+        return this.leftoverLoad;
     }
 
     /**
@@ -209,7 +209,7 @@ public final class Solution implements Comparable<Solution>, AutoCloseable {
     int getLeftoverLoadAfter(Route removed, Route... added) {
         // ponytail: copies the per-depot loads, which is a handful of entries; fold the
         // deltas in place if the split ever spends measurable time here.
-        Map<Depot, Integer> loads = new LinkedHashMap<>(this.DepotLoads);
+        Map<Depot, Integer> loads = new LinkedHashMap<>(this.depotLoads);
         if (removed != null)
             loads.merge(removed.getDepot(), -removed.getSumDemand(), Integer::sum);
         for (Route route : added)
@@ -228,17 +228,17 @@ public final class Solution implements Comparable<Solution>, AutoCloseable {
      * @param route the route to remove
      */
     void remove(Route route) {
-        List<Route> routes = this.Routes.get(route.getDepot());
+        List<Route> routes = this.routes.get(route.getDepot());
         if (routes != null && routes.remove(route)) {
             int oldLeftover = this.getLeftOver(route.getDepot());
             if (routes.isEmpty()) {
-                this.Routes.remove(route.getDepot());
-                this.DepotLoads.remove(route.getDepot());
-                this.LeftoverLoad -= oldLeftover;
+                this.routes.remove(route.getDepot());
+                this.depotLoads.remove(route.getDepot());
+                this.leftoverLoad -= oldLeftover;
             }
             else {
-                this.DepotLoads.merge(route.getDepot(), -route.getSumDemand(), Integer::sum);
-                this.LeftoverLoad += this.getLeftOver(route.getDepot()) - oldLeftover;
+                this.depotLoads.merge(route.getDepot(), -route.getSumDemand(), Integer::sum);
+                this.leftoverLoad += this.getLeftOver(route.getDepot()) - oldLeftover;
             }
         }
     }
@@ -248,7 +248,7 @@ public final class Solution implements Comparable<Solution>, AutoCloseable {
      */
     List<Route> getRoutes() {
         List<Route> routes = new LinkedList<>();
-        for (List<Route> depotRoutes : this.Routes.values())
+        for (List<Route> depotRoutes : this.routes.values())
             routes.addAll(depotRoutes);
         return routes;
     }
@@ -258,14 +258,14 @@ public final class Solution implements Comparable<Solution>, AutoCloseable {
      * @return the routes making up this solution for the given depot
      */
     List<Route> getRoutes(Depot depot) {
-        return this.Routes.getOrDefault(depot, new LinkedList<>());
+        return this.routes.getOrDefault(depot, new LinkedList<>());
     }
 
     /**
      * @return the routes making up this solution, grouped by serving depot
      */
     Map<Depot, List<Route>> getRoutesByDepot() {
-        return this.Routes;
+        return this.routes;
     }
 
     /**
@@ -273,7 +273,7 @@ public final class Solution implements Comparable<Solution>, AutoCloseable {
      */
     int getRoutesCount() {
         int count = 0;
-        for (List<Route> depotRoutes : this.Routes.values())
+        for (List<Route> depotRoutes : this.routes.values())
             count += depotRoutes.size();
         return count;
     }
@@ -282,14 +282,14 @@ public final class Solution implements Comparable<Solution>, AutoCloseable {
      * @return the number of depots opened by this solution
      */
     int getDepotsCount() {
-        return this.Routes.size();
+        return this.routes.size();
     }
 
     /**
      * @return the total travelled distance of the solution
      */
     public double getTotalDistance() {
-        return this.TotalDistance;
+        return this.totalDistance;
     }
 
     /**
@@ -299,9 +299,9 @@ public final class Solution implements Comparable<Solution>, AutoCloseable {
      * @return the concatenated stop sequence
      */
     int[] getNewSequence() {
-        int[] sequence = new int[this.Stops.cardinality()];
+        int[] sequence = new int[this.stops.cardinality()];
         int index = 0;
-        for (List<Route> depotRoutes : this.Routes.values())
+        for (List<Route> depotRoutes : this.routes.values())
             for (Route route : depotRoutes)
                 for (int stop : route.getSequence())
                     sequence[index++] = stop;
@@ -328,7 +328,7 @@ public final class Solution implements Comparable<Solution>, AutoCloseable {
             sb.append("\n");
         }
         sb.append("Opened depots = ").append(this.getDepotsCount());
-        sb.append(", total cost = ").append(String.format(Locale.US, "%.2f", this.TotalDistance));
+        sb.append(", total cost = ").append(String.format(Locale.US, "%.2f", this.totalDistance));
         return sb.toString();
     }
 
@@ -360,7 +360,7 @@ public final class Solution implements Comparable<Solution>, AutoCloseable {
      */
     @Override
     public int compareTo(Solution sol) {
-        return Double.compare(this.TotalDistance * 100d, sol.TotalDistance * 100d);
+        return Double.compare(this.totalDistance * 100d, sol.totalDistance * 100d);
     }
 
     /**
@@ -372,8 +372,8 @@ public final class Solution implements Comparable<Solution>, AutoCloseable {
     public void close() {
         for (Route route : this.getRoutes())
             route.close();
-        this.Routes.clear();
-        this.DepotLoads.clear();
-        this.Stops.clear();
+        this.routes.clear();
+        this.depotLoads.clear();
+        this.stops.clear();
     }
 }

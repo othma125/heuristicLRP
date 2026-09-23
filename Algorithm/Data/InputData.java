@@ -28,14 +28,14 @@ import java.util.Map;
  * @author Othmane EL YAAKOUBI
  */
 public class InputData implements AutoCloseable {
-    public final String FileName;
-    private final int CustomerNumber;
-    private final int DepotNumber;
-    private final int Capacity;
-    private final int[] Demands;
-    private final Depot[] Depots;
-    private final double RouteCost;
-    private final boolean RealCosts;
+    public final String fileName;
+    private final int customerNumber;
+    private final int depotNumber;
+    private final int capacity;
+    private final int[] demands;
+    private final Depot[] depots;
+    private final double routeCost;
+    private final boolean realCosts;
     // Keyed by undirected Edge, so one entry covers both directions; filled once in the
     // constructor and never written again, which makes it safe to read from the parallel
     // split workers without synchronization.
@@ -43,21 +43,21 @@ public class InputData implements AutoCloseable {
     // heuristicCVRP, an Edge-keyed map runs 22/49/72 ns at n = 101/1001/10001 against
     // 5.5/5.4/13.5 ns for plain recomputation, and boxing every leg adds ~1.5 MB at n = 220.
     // Go back to a flat matrix (or recompute on the fly) if distance lookup shows in a profile.
-    private final Map<Edge, Double> Distances;
+    private final Map<Edge, Double> distances;
     // Carried here because the instance is the one object every split and local search
     // already receives, so a stop can be seen deep in the search without new plumbing.
-    private volatile boolean StopRequested = false;
+    private volatile boolean stopRequested = false;
 
     /** Asks any split work running on this instance to abort as soon as it can. */
     public void requestStop() {
-        this.StopRequested = true;
+        this.stopRequested = true;
     }
 
     /**
      * @return {@code true} once {@link #requestStop()} has been called
      */
     public boolean isStopRequested() {
-        return this.StopRequested;
+        return this.stopRequested;
     }
 
     /**
@@ -66,7 +66,7 @@ public class InputData implements AutoCloseable {
      */
     @Override
     public void close() {
-        this.StopRequested = true;
+        this.stopRequested = true;
     }
 
     /**
@@ -76,15 +76,15 @@ public class InputData implements AutoCloseable {
      * @throws IOException if the file cannot be read
      */
     public InputData(String file) throws IOException {
-        this.FileName = file;
+        this.fileName = file;
         String[] token = Files.readString(Path.of(file), StandardCharsets.ISO_8859_1)
                               .trim().split("\\s+");
         int t = 0;
 
         /* ---------- SIZES ---------- */
-        this.CustomerNumber = (int) Double.parseDouble(token[t++]);
-        this.DepotNumber = (int) Double.parseDouble(token[t++]);
-        int nodes = this.DepotNumber + this.CustomerNumber;
+        this.customerNumber = (int) Double.parseDouble(token[t++]);
+        this.depotNumber = (int) Double.parseDouble(token[t++]);
+        int nodes = this.depotNumber + this.customerNumber;
 
         /* ---------- COORDINATES (depots first, then customers) ---------- */
         Location[] locations = new Location[nodes];
@@ -93,35 +93,35 @@ public class InputData implements AutoCloseable {
                                         Double.parseDouble(token[t++]));
 
         /* ---------- CAPACITIES, DEMANDS, COSTS ---------- */
-        this.Capacity = (int) Double.parseDouble(token[t++]);
-        int[] depotCapacities = new int[this.DepotNumber];
-        for (int d = 0; d < this.DepotNumber; d++)
+        this.capacity = (int) Double.parseDouble(token[t++]);
+        int[] depotCapacities = new int[this.depotNumber];
+        for (int d = 0; d < this.depotNumber; d++)
             depotCapacities[d] = (int) Double.parseDouble(token[t++]);
-        this.Demands = new int[this.CustomerNumber];
-        for (int c = 0; c < this.CustomerNumber; c++)
-            this.Demands[c] = (int) Double.parseDouble(token[t++]);
-        this.Depots = new Depot[this.DepotNumber];
-        for (int d = 0; d < this.DepotNumber; d++)
-            this.Depots[d] = new Depot(d, locations[d], depotCapacities[d],
+        this.demands = new int[this.customerNumber];
+        for (int c = 0; c < this.customerNumber; c++)
+            this.demands[c] = (int) Double.parseDouble(token[t++]);
+        this.depots = new Depot[this.depotNumber];
+        for (int d = 0; d < this.depotNumber; d++)
+            this.depots[d] = new Depot(d, locations[d], depotCapacities[d],
                                        Double.parseDouble(token[t++]));
-        this.RouteCost = Double.parseDouble(token[t++]);
-        this.RealCosts = Double.parseDouble(token[t++]) == 1;
+        this.routeCost = Double.parseDouble(token[t++]);
+        this.realCosts = Double.parseDouble(token[t++]) == 1;
         // Positional parsing silently shifts on a file that does not follow the format,
         // so refuse anything whose number count does not match the announced sizes.
         if (t != token.length)
             throw new IOException(file + ": expected " + t + " numbers, found " + token.length);
 
         /* ---------- DISTANCES ---------- */
-        this.Distances = new HashMap<>();
+        this.distances = new HashMap<>();
         for (int a = 0; a < nodes; a++)
             for (int b = 0; b < a; b++) {
                 double distance = locations[a].distanceTo(locations[b]);
                 // files format.txt says the scaled distance is truncated, but the published
                 // costs only reproduce with each leg rounded up: on 20-5-2b the optimum comes
                 // out at exactly 37542 this way, and 21 below it when truncated.
-                if (!this.RealCosts)
+                if (!this.realCosts)
                     distance = Math.ceil(distance * 100);
-                this.Distances.put(new Edge(a, b), distance);
+                this.distances.put(new Edge(a, b), distance);
             }
     }
 
@@ -137,7 +137,7 @@ public class InputData implements AutoCloseable {
      * @return the distance between the two nodes, or 0 if they are the same node
      */
     private double getDistance(int node1, int node2) {
-        return this.Distances.getOrDefault(new Edge(node1, node2), 0.0);
+        return this.distances.getOrDefault(new Edge(node1, node2), 0.0);
     }
 
     /**
@@ -146,7 +146,7 @@ public class InputData implements AutoCloseable {
      * @return the distance between the two customers
      */
     public double getTwoStopsDistance(int stop1, int stop2) {
-        return this.getDistance(this.DepotNumber + stop1, this.DepotNumber + stop2);
+        return this.getDistance(this.depotNumber + stop1, this.depotNumber + stop2);
     }
 
     /**
@@ -155,7 +155,7 @@ public class InputData implements AutoCloseable {
      * @return the distance from the customer back to the depot
      */
     public double getStopToDepotDistance(int stop, Depot depot) {
-        return this.getDistance(this.DepotNumber + stop, depot.index());
+        return this.getDistance(this.depotNumber + stop, depot.index());
     }
 
     /**
@@ -164,7 +164,7 @@ public class InputData implements AutoCloseable {
      * @return the distance from the depot out to the customer
      */
     public double getDepotToStopDistance(Depot depot, int stop) {
-        return this.getDistance(depot.index(), this.DepotNumber + stop);
+        return this.getDistance(depot.index(), this.depotNumber + stop);
     }
 
     /* ======================
@@ -174,28 +174,28 @@ public class InputData implements AutoCloseable {
      * @return the number of customers
      */
     public int getCustomerNumber() {
-        return this.CustomerNumber;
+        return this.customerNumber;
     }
 
     /**
      * @return the number of candidate depots
      */
     public int getDepotNumber() {
-        return this.DepotNumber;
+        return this.depotNumber;
     }
 
     /**
      * @return the number of nodes in the instance, depots plus customers
      */
     public int getSize() {
-        return this.DepotNumber + this.CustomerNumber;
+        return this.depotNumber + this.customerNumber;
     }
 
     /**
      * @return the vehicle capacity
      */
     public int getCapacity() {
-        return this.Capacity;
+        return this.capacity;
     }
 
     /**
@@ -203,7 +203,7 @@ public class InputData implements AutoCloseable {
      * @return the demand of the customer
      */
     public int getDemand(int stop) {
-        return this.Demands[stop];
+        return this.demands[stop];
     }
 
     /**
@@ -211,14 +211,14 @@ public class InputData implements AutoCloseable {
      *         opening costs (the backing array, not a copy)
      */
     public Depot[] getDepots() {
-        return this.Depots;
+        return this.depots;
     }
 
     /**
      * @return the opening cost of a single route (one vehicle)
      */
     public double getRouteCost() {
-        return this.RouteCost;
+        return this.routeCost;
     }
 
     /**
@@ -226,7 +226,7 @@ public class InputData implements AutoCloseable {
      *         distances are scaled by 100 and rounded up to integers
      */
     public boolean hasRealCosts() {
-        return this.RealCosts;
+        return this.realCosts;
     }
 
     /* ======================
@@ -235,11 +235,11 @@ public class InputData implements AutoCloseable {
 
     @Override
     public String toString() {
-        return "InputData { CustomerNumber = " + this.CustomerNumber
-                + ", DepotNumber = " + this.DepotNumber
-                + ", Capacity = " + this.Capacity
-                + ", RouteCost = " + this.RouteCost
-                + ", RealCosts = " + this.RealCosts + " }";
+        return "InputData { CustomerNumber = " + this.customerNumber
+                + ", DepotNumber = " + this.depotNumber
+                + ", Capacity = " + this.capacity
+                + ", RouteCost = " + this.routeCost
+                + ", RealCosts = " + this.realCosts + " }";
     }
 
     // ponytail: self-check instead of a test framework, run with

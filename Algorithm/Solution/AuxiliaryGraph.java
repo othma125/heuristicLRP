@@ -20,19 +20,19 @@ import Algorithm.Data.InputData;
  * <p>Arcs are relaxed concurrently: each {@link ArcSetter} is a
  * {@link RecursiveAction} submitted to the common {@link ForkJoinPool}, and a
  * {@link Phaser} keeps the constructor blocked until the whole graph has been
- * explored. The {@code Bound} prunes partial solutions that cannot improve on
+ * explored. The {@code bound} prunes partial solutions that cannot improve on
  * the incumbent cost.
  *
  * @author Othmane EL YAAKOUBI
  */
 public class AuxiliaryGraph implements AutoCloseable {
 
-    private final int Length;
-    private final double Bound;
-    private final int[][] Tours;
-    private AuxiliaryGraphNode[] Nodes;
-    private final InputData Data;
-    private final Set<ArcSetter> ArcsSetters;
+    private final int length;
+    private final double bound;
+    private final int[][] tours;
+    private AuxiliaryGraphNode[] nodes;
+    private final InputData data;
+    private final Set<ArcSetter> arcsSetters;
     private final Phaser phaser = new Phaser(1);
 
     /**
@@ -41,26 +41,26 @@ public class AuxiliaryGraph implements AutoCloseable {
      *
      * @param data        the problem instance
      * @param bound       cost upper bound used to prune partial solutions
-     * @param giant_tours one or more tours to split (more than one enables the graph-based crossover)
+     * @param giantTours one or more tours to split (more than one enables the graph-based crossover)
      */
-    AuxiliaryGraph(InputData data, double bound, GiantTour ... giant_tours) {
-        this.Data = data;
-        this.Bound = bound;
+    AuxiliaryGraph(InputData data, double bound, GiantTour ... giantTours) {
+        this.data = data;
+        this.bound = bound;
         // Snapshot the parents once: the individuals being recombined are re-split by other
         // threads, which swaps their sequence, and every walk must see one stable permutation.
-        this.Tours = new int[giant_tours.length][];
-        for (int i = 0; i < giant_tours.length; i++)
-            this.Tours[i] = giant_tours[i].getSequenceSnapshot();
-        this.Length = this.Tours[0].length;
-        this.Nodes = new AuxiliaryGraphNode[this.Length + 1];
-        for (int i = 0; i <= this.Length; i++) 
-            this.Nodes[i] = new AuxiliaryGraphNode(i);
-        this.ArcsSetters = ConcurrentHashMap.newKeySet();
-        for (int[] tour : this.Tours) {
+        this.tours = new int[giantTours.length][];
+        for (int i = 0; i < giantTours.length; i++)
+            this.tours[i] = giantTours[i].getSequenceSnapshot();
+        this.length = this.tours[0].length;
+        this.nodes = new AuxiliaryGraphNode[this.length + 1];
+        for (int i = 0; i <= this.length; i++) 
+            this.nodes[i] = new AuxiliaryGraphNode(i);
+        this.arcsSetters = ConcurrentHashMap.newKeySet();
+        for (int[] tour : this.tours) {
             if (data.isStopRequested())
                 break;
-            ArcSetter setter = new ArcSetter(this, this.Nodes[0], null, tour);
-            this.ArcsSetters.add(setter);
+            ArcSetter setter = new ArcSetter(this, this.nodes[0], null, tour);
+            this.arcsSetters.add(setter);
             this.phaser.register();
             ForkJoinPool.commonPool().execute(setter);
         }
@@ -68,7 +68,7 @@ public class AuxiliaryGraph implements AutoCloseable {
         if (this.isFeasible())
             this.getLastNode().getSolutions()
                                 .stream()
-                                .forEach(s -> s.InterRoutesLocalSearch(data));
+                                .forEach(s -> s.interRoutesLocalSearch(data));
     }
 
     /**
@@ -82,29 +82,29 @@ public class AuxiliaryGraph implements AutoCloseable {
     void setNewSetters(AuxiliaryGraphNode node) {
         // A stopped run spawns no further arcs: the setters still in flight drain, the
         // phaser advances, and the constructor returns instead of exploring the graph.
-        if (node.NodeIndex == this.Length || this.Data.isStopRequested())
+        if (node.nodeIndex == this.length || this.data.isStopRequested())
             return;
-        node.Lock.lock();
+        node.lock.lock();
         try {
             boolean allMatch = true;
-            for (ArcSetter setter : this.ArcsSetters) 
-                if (setter.StartingNode == node || setter.NodeProcessingWith < node.NodeIndex) {
+            for (ArcSetter setter : this.arcsSetters) 
+                if (setter.startingNode == node || setter.nodeProcessingWith < node.nodeIndex) {
                     allMatch = false;
                     break;
                 }
             if (allMatch) 
                 node.getParetoSet().stream()
-                                    .filter(solution -> solution.getTotalDistance() < this.Bound)
+                                    .filter(solution -> solution.getTotalDistance() < this.bound)
                                     .forEach(solution -> {
-                                        for (int[] tour : this.Tours) {
+                                        for (int[] tour : this.tours) {
                                             ArcSetter setter = new ArcSetter(this, node, solution, tour);
-                                            this.ArcsSetters.add(setter);
+                                            this.arcsSetters.add(setter);
                                             this.phaser.register();
                                             ForkJoinPool.commonPool().execute(setter);
                                         }
                                     });
         } finally {
-            node.Lock.unlock();
+            node.lock.unlock();
         }
     }
     
@@ -113,7 +113,7 @@ public class AuxiliaryGraph implements AutoCloseable {
      * @return the sink node (end of the tour)
      */
     AuxiliaryGraphNode getLastNode() {
-        return this.getNode(this.Length);
+        return this.getNode(this.length);
     }
 
     /**
@@ -121,7 +121,7 @@ public class AuxiliaryGraph implements AutoCloseable {
      * @return the node at the given index
      */
     AuxiliaryGraphNode getNode(int i) {
-        return this.Nodes[i];
+        return this.nodes[i];
     }
 
     /**
@@ -184,23 +184,23 @@ public class AuxiliaryGraph implements AutoCloseable {
     @Override
     public void close() {
         new Thread(() -> {
-            for (AuxiliaryGraphNode node : this.Nodes)
+            for (AuxiliaryGraphNode node : this.nodes)
                 node.close();
-            this.Nodes = null;
+            this.nodes = null;
         }).start();
     }
 
     // Getter methods for ArcSetter access
     int getLength() {
-        return this.Length;
+        return this.length;
     }
 
     InputData getData() {
-        return this.Data;
+        return this.data;
     }
 
     int[][] getTours() {
-        return this.Tours;
+        return this.tours;
     }
 
     Phaser getPhaser() {
@@ -208,6 +208,6 @@ public class AuxiliaryGraph implements AutoCloseable {
     }
 
     Set<ArcSetter> getArcsSetters() {
-        return this.ArcsSetters;
+        return this.arcsSetters;
     }
 }

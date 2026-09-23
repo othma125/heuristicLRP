@@ -27,8 +27,8 @@ import Algorithm.Solution.LSM._2Opt;
  */
 public final class Route implements Comparable<Route>, AutoCloseable {
 
-    private final Depot Depot;
-    private int[] Sequence;
+    private final Depot depot;
+    private int[] sequence;
     private int sumDemand;
     private double cost;
     // A depot is paid for once however many routes leave it, so the charge rides on the first
@@ -38,11 +38,11 @@ public final class Route implements Comparable<Route>, AutoCloseable {
 
     @Override
     public int hashCode() {
-        int hash = this.Sequence.length;
+        int hash = this.sequence.length;
         hash = 31 * hash + this.sumDemand;
-        hash = 31 * hash + this.Depot.index();
+        hash = 31 * hash + this.depot.index();
         int sum = 0;
-        for (int value : this.Sequence)
+        for (int value : this.sequence)
             sum += value;
         return 31 * hash + sum;
     }
@@ -56,10 +56,10 @@ public final class Route implements Comparable<Route>, AutoCloseable {
         if (this.getClass() != obj.getClass())
             return false;
         final Route other = (Route) obj;
-        if (this.Sequence.length != other.Sequence.length || this.sumDemand != other.sumDemand
-            || !this.Depot.equals(other.Depot))
+        if (this.sequence.length != other.sequence.length || this.sumDemand != other.sumDemand
+            || !this.depot.equals(other.depot))
             return false;
-        return Arrays.equals(this.Sequence, other.Sequence);
+        return Arrays.equals(this.sequence, other.sequence);
     }
 
     /**
@@ -67,13 +67,13 @@ public final class Route implements Comparable<Route>, AutoCloseable {
      *
      * @param depot      the depot the route starts and ends at
      * @param seq        the ordered stop sequence
-     * @param sum_demand the total demand of the sequence
+     * @param sumDemand the total demand of the sequence
      * @param dist       the total travelled distance of the sequence
      */
-    public Route(Depot depot, int[] seq, int sum_demand, double dist) {
-        this.Depot = depot;
-        this.Sequence = seq;
-        this.sumDemand = sum_demand;
+    public Route(Depot depot, int[] seq, int sumDemand, double dist) {
+        this.depot = depot;
+        this.sequence = seq;
+        this.sumDemand = sumDemand;
         this.cost = dist;
     }
 
@@ -88,8 +88,8 @@ public final class Route implements Comparable<Route>, AutoCloseable {
      * @param seq      the ordered stop sequence
      */
     public Route(InputData data, Solution solution, Depot depot, int[] seq) {
-        this.Depot = depot;
-        this.Sequence = seq;
+        this.depot = depot;
+        this.sequence = seq;
         this.setCost(data, solution);
     }
 
@@ -103,8 +103,8 @@ public final class Route implements Comparable<Route>, AutoCloseable {
      * @param paysDepotOpening  whether this route carries the depot opening cost
      */
     public Route(InputData data, Depot depot, int[] seq, boolean paysDepotOpening) {
-        this.Depot = depot;
-        this.Sequence = seq;
+        this.depot = depot;
+        this.sequence = seq;
         this.setCost(data, paysDepotOpening);
     }
 
@@ -117,7 +117,7 @@ public final class Route implements Comparable<Route>, AutoCloseable {
      * @param solution the solution the route belongs to, or {@code null}
      */
     public void setCost(InputData data, Solution solution) {
-        this.setCost(data, solution == null || solution.getRoutes(this.Depot).isEmpty());
+        this.setCost(data, solution == null || solution.getRoutes(this.depot).isEmpty());
     }
 
     /**
@@ -129,20 +129,20 @@ public final class Route implements Comparable<Route>, AutoCloseable {
      * @param paysDepotOpening whether this route carries the depot opening cost
      */
     public void setCost(InputData data, boolean paysDepotOpening) {
-        this.cost = data.getDepotToStopDistance(this.Depot, this.Sequence[0]);
+        this.cost = data.getDepotToStopDistance(this.depot, this.sequence[0]);
         this.sumDemand = 0;
         int i = 0;
-        while (i < this.Sequence.length - 1) {
-            this.sumDemand += data.getDemand(this.Sequence[i]);
-            this.cost += data.getTwoStopsDistance(this.Sequence[i], this.Sequence[++i]);
+        while (i < this.sequence.length - 1) {
+            this.sumDemand += data.getDemand(this.sequence[i]);
+            this.cost += data.getTwoStopsDistance(this.sequence[i], this.sequence[++i]);
         }
-        this.cost += data.getStopToDepotDistance(this.Sequence[i], this.Depot);
-        this.sumDemand += data.getDemand(this.Sequence[i]);
+        this.cost += data.getStopToDepotDistance(this.sequence[i], this.depot);
+        this.sumDemand += data.getDemand(this.sequence[i]);
         // Every route needs a vehicle, and the first route of a depot pays for opening it.
         this.cost += data.getRouteCost();
         this.payDepotOpening = paysDepotOpening;
         if (this.payDepotOpening)
-            this.cost += this.Depot.openingCost();
+            this.cost += this.depot.openingCost();
     }
 
     /**
@@ -163,44 +163,44 @@ public final class Route implements Comparable<Route>, AutoCloseable {
      * @param data the problem instance providing distances and demands
      * @return {@code true} if an improving move was found and applied
      */
-    public boolean StagnationBreaker(InputData data) {
-	    int max = (int) Math.sqrt(this.Sequence.length);
-        for (int i = 0; i < this.Sequence.length - 1 && !data.isStopRequested(); i++) {
-            LocalSearchMove best_lsm = null;
-            for (int j = i + 1; j < this.Sequence.length; j++) {   
+    public boolean stagnationBreaker(InputData data) {
+	    int max = (int) Math.sqrt(this.sequence.length);
+        for (int i = 0; i < this.sequence.length - 1 && !data.isStopRequested(); i++) {
+            LocalSearchMove bestLsm = null;
+            for (int j = i + 1; j < this.sequence.length; j++) {   
                 if (j > i + 1) {
                     LocalSearchMove lsm = new Swap(data, i, j, this);
                     lsm.setGain(data);
-                    if (best_lsm == null || lsm.getGain() < best_lsm.getGain())
-                        best_lsm = lsm;
+                    if (bestLsm == null || lsm.getGain() < bestLsm.getGain())
+                        bestLsm = lsm;
                 }
-                for (int degree = j == i + 1 ? 1 : 0; degree <= max && j + degree < this.Sequence.length; degree++) {
+                for (int degree = j == i + 1 ? 1 : 0; degree <= max && j + degree < this.sequence.length; degree++) {
                     LocalSearchMove lsm1 = new RightShift(data, true, degree, i, j, this);
                     lsm1.setGain(data);
-                    if (best_lsm == null || lsm1.getGain() < best_lsm.getGain())
-                        best_lsm = lsm1;
+                    if (bestLsm == null || lsm1.getGain() < bestLsm.getGain())
+                        bestLsm = lsm1;
                     if (degree == 0)
                         continue;
                     LocalSearchMove lsm2 = new RightShift(data, false, degree, i, j, this);
                     lsm2.setGain(data);
-                    if (best_lsm == null || lsm2.getGain() < best_lsm.getGain())
-                        best_lsm = lsm2;
+                    if (bestLsm == null || lsm2.getGain() < bestLsm.getGain())
+                        bestLsm = lsm2;
                 }
                 for (int degree = j == i + 1 ? 1 : 0; degree <= max && i - degree >= 0; degree++) {
                     LocalSearchMove lsm1 = new LeftShift(data, true, degree, i, j, this);
                     lsm1.setGain(data);
-                    if (best_lsm == null || lsm1.getGain() < best_lsm.getGain())
-                        best_lsm = lsm1;
+                    if (bestLsm == null || lsm1.getGain() < bestLsm.getGain())
+                        bestLsm = lsm1;
                     if (degree == 0)
                         continue;
                     LocalSearchMove lsm2 = new LeftShift(data, false, degree, i, j, this);
                     lsm2.setGain(data);
-                    if (best_lsm == null || lsm2.getGain() < best_lsm.getGain())
-                        best_lsm = lsm2;
+                    if (bestLsm == null || lsm2.getGain() < bestLsm.getGain())
+                        bestLsm = lsm2;
                 }
             }          
-            if (best_lsm != null && best_lsm.getGain() < 0d) {
-                best_lsm.Perform(data);
+            if (bestLsm != null && bestLsm.getGain() < 0d) {
+                bestLsm.perform(data);
                 return true;
             }
         }
@@ -213,42 +213,42 @@ public final class Route implements Comparable<Route>, AutoCloseable {
      *
      * @param data the problem instance providing distances and demands
      */
-    public void IntraRoutesLocalSearch(InputData data) {
-        if (this.Sequence.length <= 2)
+    public void intraRoutesLocalSearch(InputData data) {
+        if (this.sequence.length <= 2)
             return;
-        this.IntraRoutesLocalSearch(data, Math.sqrt(this.Sequence.length) / this.Sequence.length);
+        this.intraRoutesLocalSearch(data, Math.sqrt(this.sequence.length) / this.sequence.length);
     }
 
     /**
      * Applies improving 2-opt moves within the route, capped at
      * {@code sqrt(length)} improvements per pass, then probabilistically either
-     * repeats the pass or invokes {@link #StagnationBreaker(InputData)}. Returns
+     * repeats the pass or invokes {@link #stagnationBreaker(InputData)}. Returns
      * immediately once a stop has been requested.
      *
      * @param data        the problem instance providing distances and demands
      * @param probability controls how likely the search is to stop rather than
      *                    recurse for another pass
      */
-    public void IntraRoutesLocalSearch(InputData data, double probability) {
+    public void intraRoutesLocalSearch(InputData data, double probability) {
         // Every local-search pass in the split graph funnels through here, so this is the
         // one place a stop request has to be honoured: without it a Stop click waits
         // minutes for the recursion to unwind on a large instance.
         if (data.isStopRequested())
             return;
-        int max = (int) Math.sqrt(this.Sequence.length);
+        int max = (int) Math.sqrt(this.sequence.length);
         int improvementCounter = 0;
-        for (int i = 0; improvementCounter < max && i < this.Sequence.length - 1 && !data.isStopRequested(); i++)
-            for (int j = i + 1; improvementCounter < max && j < this.Sequence.length ; j++) {
+        for (int i = 0; improvementCounter < max && i < this.sequence.length - 1 && !data.isStopRequested(); i++)
+            for (int j = i + 1; improvementCounter < max && j < this.sequence.length ; j++) {
                 LocalSearchMove lsm = new _2Opt(data, i , j, this);
                 lsm.setGain(data);
                 if (lsm.getGain() < 0d) {
-                    lsm.Perform(data);
+                    lsm.perform(data);
                     improvementCounter++;
                 }
             }
         boolean again = ThreadLocalRandom.current().nextDouble() > probability;
-        if ((again && improvementCounter > 0) || (!again && improvementCounter < max && this.StagnationBreaker(data))) 
-            this.IntraRoutesLocalSearch(data);
+        if ((again && improvementCounter > 0) || (!again && improvementCounter < max && this.stagnationBreaker(data))) 
+            this.intraRoutesLocalSearch(data);
     }
     
     /**
@@ -268,24 +268,24 @@ public final class Route implements Comparable<Route>, AutoCloseable {
      */
     public LocalSearchMove getLSM(InputData data, Route other, Solution solution) {
         LocalSearchMove lsm;
-        if (this.Depot.equals(other.Depot)) {
-            for (int i = 0; i < this.Sequence.length && !data.isStopRequested(); i++)
-                for (int j = 0; j < other.Sequence.length ; j++) {
+        if (this.depot.equals(other.depot)) {
+            for (int i = 0; i < this.sequence.length && !data.isStopRequested(); i++)
+                for (int j = 0; j < other.sequence.length ; j++) {
                     lsm = new _2Opt(data, i , j, this, other);
                     lsm.setGain(data);
                     if (lsm.getGain() < 0d && lsm.isFeasible(data, solution))
                         return lsm;
                 }
-            for (int i = 0; i < other.Sequence.length && !data.isStopRequested(); i++)
-                for (int j = 0; j < this.Sequence.length ; j++) {
+            for (int i = 0; i < other.sequence.length && !data.isStopRequested(); i++)
+                for (int j = 0; j < this.sequence.length ; j++) {
                     lsm = new _2Opt(data, i , j, other, this);
                     lsm.setGain(data);
                     if (lsm.getGain() < 0d && lsm.isFeasible(data, solution))
                         return lsm;
                 }
         }
-        for (int i = 0; i < this.Sequence.length && !data.isStopRequested(); i++)
-            for (int j = 0; j < other.Sequence.length ; j++) {
+        for (int i = 0; i < this.sequence.length && !data.isStopRequested(); i++)
+            for (int j = 0; j < other.sequence.length ; j++) {
                 lsm = new Swap(data, i, j, this, other);
                 if (lsm.isFeasible(data, solution)) {
                     lsm.setGain(data);
@@ -293,11 +293,11 @@ public final class Route implements Comparable<Route>, AutoCloseable {
                         return lsm;
                 }
             }
-        int max1 = (int) Math.sqrt(this.Sequence.length);
-        int max2 = (int) Math.sqrt(other.Sequence.length);
-        for (int i = 0; i < this.Sequence.length && !data.isStopRequested(); i++)
-            for (int j = 0; j < other.Sequence.length ; j++) {
-                for (int degree = j == i + 1 ? 1 : 0; degree <= max2 && j + degree < other.Sequence.length; degree++) {
+        int max1 = (int) Math.sqrt(this.sequence.length);
+        int max2 = (int) Math.sqrt(other.sequence.length);
+        for (int i = 0; i < this.sequence.length && !data.isStopRequested(); i++)
+            for (int j = 0; j < other.sequence.length ; j++) {
+                for (int degree = j == i + 1 ? 1 : 0; degree <= max2 && j + degree < other.sequence.length; degree++) {
                     lsm = new RightShift(data, true, degree, i, j, this, other);
                     if (lsm.isFeasible(data, solution)) {
                         lsm.setGain(data);
@@ -355,9 +355,9 @@ public final class Route implements Comparable<Route>, AutoCloseable {
 
     @Override
     public String toString() {
-        int[] modifiedSequence = new int[this.Sequence.length];
-        for (int i = 0; i < this.Sequence.length; i++)
-            modifiedSequence[i] = this.Sequence[i] + 1;
+        int[] modifiedSequence = new int[this.sequence.length];
+        for (int i = 0; i < this.sequence.length; i++)
+            modifiedSequence[i] = this.sequence[i] + 1;
         return Arrays.toString(modifiedSequence);
     }
 
@@ -365,7 +365,7 @@ public final class Route implements Comparable<Route>, AutoCloseable {
      * @return the depot the route starts and ends at
      */
     public Depot getDepot() {
-        return this.Depot;
+        return this.depot;
     }
 
     /**
@@ -373,7 +373,7 @@ public final class Route implements Comparable<Route>, AutoCloseable {
      */
     public java.util.List<Integer> getSequenceAsList() {
         List<Integer> list = new ArrayList<>();
-        for (int stop : this.Sequence)
+        for (int stop : this.sequence)
             list.add(stop);
         return list;
     }
@@ -382,21 +382,21 @@ public final class Route implements Comparable<Route>, AutoCloseable {
      * @return the first stop of the route
      */
     public int getFirst() {
-        return this.Sequence[0];
+        return this.sequence[0];
     }
 
     /**
      * @return the last stop of the route
      */
     public int getLast() {
-        return this.Sequence[this.Sequence.length - 1];
+        return this.sequence[this.sequence.length - 1];
     }
 
     /**
      * @return the backing stop sequence (not a copy)
      */
     public int[] getSequence() {
-        return this.Sequence;
+        return this.sequence;
     }
 
     /**
@@ -418,7 +418,7 @@ public final class Route implements Comparable<Route>, AutoCloseable {
      * @return the stop at the given position
      */
     public int getStop(int index) {
-        return this.Sequence[index];
+        return this.sequence[index];
     }
 
     /**
@@ -426,7 +426,7 @@ public final class Route implements Comparable<Route>, AutoCloseable {
      */
     String export() {
         StringBuilder sb = new StringBuilder();
-        for (int stop : this.Sequence)
+        for (int stop : this.sequence)
             sb.append(stop + 1).append(" ");
         return sb.toString();
     }
@@ -435,7 +435,7 @@ public final class Route implements Comparable<Route>, AutoCloseable {
      * @return the number of stops in the route
      */
     public int getLength() {
-        return this.Sequence.length;
+        return this.sequence.length;
     }
 
     /**
@@ -444,7 +444,7 @@ public final class Route implements Comparable<Route>, AutoCloseable {
      *
      * @param gain the change in travelled distance
      */
-    public void Improve(double gain) {
+    public void improve(double gain) {
         this.cost += gain;
     }
 
@@ -454,8 +454,8 @@ public final class Route implements Comparable<Route>, AutoCloseable {
      * @param i first position
      * @param j second position
      */
-    public void Swap(int i, int j) {
-        new Move(i, j).Swap(this.Sequence);
+    public void swap(int i, int j) {
+        new Move(i, j).swap(this.sequence);
     }
 
     /**
@@ -465,7 +465,7 @@ public final class Route implements Comparable<Route>, AutoCloseable {
      * @param j segment end
      */
     public void _2Opt(int i, int j) {
-        new Move(i, j)._2Opt(this.Sequence);
+        new Move(i, j)._2Opt(this.sequence);
     }
 
     /**
@@ -474,11 +474,11 @@ public final class Route implements Comparable<Route>, AutoCloseable {
      * @param i      target position
      * @param j      source position
      * @param degree number of extra stops moved together with the anchor
-     * @param _2opt  whether the shifted segment is reversed (2-opt variant)
+     * @param with2Opt  whether the shifted segment is reversed (2-opt variant)
      */
-    public void LeftShift(int i, int j, int degree, boolean _2opt) {
+    public void leftShift(int i, int j, int degree, boolean with2Opt) {
         for (int k = 0; k <= degree; k++)
-            new Move(i - k, _2opt ? j : j - k).LeftShift(this.Sequence);
+            new Move(i - k, with2Opt ? j : j - k).leftShift(this.sequence);
     }
 
     /**
@@ -487,11 +487,11 @@ public final class Route implements Comparable<Route>, AutoCloseable {
      * @param i      source position
      * @param j      target position
      * @param degree number of extra stops moved together with the anchor
-     * @param _2opt  whether the shifted segment is reversed (2-opt variant)
+     * @param with2Opt  whether the shifted segment is reversed (2-opt variant)
      */
-    public void RightShift(int i, int j, int degree, boolean _2opt) {
+    public void rightShift(int i, int j, int degree, boolean with2Opt) {
         for (int k = 0; k <= degree; k++)
-            new Move(_2opt ? i : i + k, j + k).RightShift(this.Sequence);
+            new Move(with2Opt ? i : i + k, j + k).rightShift(this.sequence);
     }
 
     /**
@@ -504,7 +504,7 @@ public final class Route implements Comparable<Route>, AutoCloseable {
         if (this.isClosed)
             return;
         // No resources to release
-        this.Sequence = null;
+        this.sequence = null;
         this.isClosed = true;
     }
 }

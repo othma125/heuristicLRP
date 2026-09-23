@@ -33,8 +33,8 @@ import Algorithm.Data.InputData;
  */
 public class GiantTour implements Comparable<GiantTour>, AutoCloseable {
 
-    public int[] Sequence;
-    public AuxiliaryGraph AuxiliaryGraph = null;
+    public int[] sequence;
+    public AuxiliaryGraph auxiliaryGraph = null;
 
     /**
      * Creates a random giant tour and optionally splits it into routes.
@@ -45,7 +45,7 @@ public class GiantTour implements Comparable<GiantTour>, AutoCloseable {
     public GiantTour(InputData data, boolean split) {
         this.setRandomGiantTour(data);
         if (split)
-            this.Split(data);
+            this.split(data);
     }
 
     /**
@@ -63,7 +63,7 @@ public class GiantTour implements Comparable<GiantTour>, AutoCloseable {
      * @param seq the customer sequence to use
      */
     public GiantTour(int[] seq) {
-        this.Sequence = seq;
+        this.sequence = seq;
     }
 
     /**
@@ -73,21 +73,21 @@ public class GiantTour implements Comparable<GiantTour>, AutoCloseable {
      * graph yields a complete split.
      *
      * @param data        the problem instance
-     * @param giant_tours the parent tours to recombine
+     * @param giantTours the parent tours to recombine
      */
-    public GiantTour(InputData data, GiantTour ... giant_tours) {
+    public GiantTour(InputData data, GiantTour ... giantTours) {
         double bound = Double.NEGATIVE_INFINITY;
-        for (GiantTour gt : giant_tours) 
+        for (GiantTour gt : giantTours) 
             if (gt.isFeasible() && gt.getFitness() > bound) 
                 bound = gt.getFitness();
-        AuxiliaryGraph graph = new AuxiliaryGraph(data, bound, giant_tours);
+        AuxiliaryGraph graph = new AuxiliaryGraph(data, bound, giantTours);
         if (graph.isFeasible()) {
-            this.AuxiliaryGraph = graph;
-            this.Sequence = this.AuxiliaryGraph.getNewSequence(data);
+            this.auxiliaryGraph = graph;
+            this.sequence = this.auxiliaryGraph.getNewSequence(data);
         }
         else {
             // an infeasible child still has to be a usable parent: keep a sequence
-            this.Sequence = giant_tours[0].Sequence.clone();
+            this.sequence = giantTours[0].sequence.clone();
             graph.close();
         }
     }
@@ -99,8 +99,8 @@ public class GiantTour implements Comparable<GiantTour>, AutoCloseable {
      * @param data the problem instance
      * @return {@code true} if the re-split improved on the current fitness
      */
-    public boolean Split(InputData data) {
-        return this.Split(data, this.getFitness());
+    public boolean split(InputData data) {
+        return this.split(data, this.getFitness());
     }
 
     /**
@@ -114,25 +114,25 @@ public class GiantTour implements Comparable<GiantTour>, AutoCloseable {
      * @return {@code true} if a split beating {@code bound} was accepted, i.e.
      *         the tour now holds a strictly better graph than it did
      */
-    private boolean Split(InputData data, double bound) {
+    private boolean split(InputData data, double bound) {
         boolean c = false;
-        if (this.AuxiliaryGraph == null) {
+        if (this.auxiliaryGraph == null) {
             AuxiliaryGraph graph = new AuxiliaryGraph(data, bound, this);
             // getLabel() is infinite on an infeasible graph, so this one test covers
             // both "feasible" and "better than what we had".
             if (graph.getLabel() < bound) {
                 c = true;
-                this.AuxiliaryGraph = graph;
+                this.auxiliaryGraph = graph;
             }
             else
                 graph.close();
         }
         else {
-            var feasibleTours = this.AuxiliaryGraph.getLastNode()
+            var feasibleTours = this.auxiliaryGraph.getLastNode()
                                                     .getParetoSet()
                                                     .stream()
                                                     .map(solution -> new GiantTour(solution.getNewSequence()))
-                                                    .filter(gt -> gt.Split(data, bound))
+                                                    .filter(gt -> gt.split(data, bound))
                                                     .collect(Collectors.toList());
             GiantTour best = feasibleTours.stream()
                                           .min(Comparator.comparingDouble(GiantTour::getFitness))
@@ -145,9 +145,9 @@ public class GiantTour implements Comparable<GiantTour>, AutoCloseable {
                 // Under the monitor read by getSequenceSnapshot: a crossover may be walking
                 // this individual right now and must not see the sequence change under it.
                 synchronized (this) {
-                    this.Sequence = best.Sequence;
-                    this.AuxiliaryGraph.close();
-                    this.AuxiliaryGraph = best.AuxiliaryGraph;
+                    this.sequence = best.sequence;
+                    this.auxiliaryGraph.close();
+                    this.auxiliaryGraph = best.auxiliaryGraph;
                 }
             }
             feasibleTours.clear();
@@ -178,7 +178,7 @@ public class GiantTour implements Comparable<GiantTour>, AutoCloseable {
         int n = data.getCustomerNumber();
         int[] customers = IntStream.range(0, n).toArray();
         for (int i = n - 1; i > 0; i--)
-            new Move(i, rnd.nextInt(i + 1)).Swap(customers);
+            new Move(i, rnd.nextInt(i + 1)).swap(customers);
         // stable sort after the shuffle: demand descending, equal demands in random order
         customers = Arrays.stream(customers)
                             .boxed()
@@ -214,9 +214,9 @@ public class GiantTour implements Comparable<GiantTour>, AutoCloseable {
             clusters.computeIfAbsent(d1, x -> new HashSet<>()).add(c);
             loads[d1] += demand;
         }
-        List<Set<Integer>> shuffled_clusters = new ArrayList<>(clusters.values());
-        Collections.shuffle(shuffled_clusters, rnd);
-        this.Sequence = shuffled_clusters.stream()
+        List<Set<Integer>> shuffledClusters = new ArrayList<>(clusters.values());
+        Collections.shuffle(shuffledClusters, rnd);
+        this.sequence = shuffledClusters.stream()
                                         .flatMap(cluster -> {
                                             List<Integer> stops = new ArrayList<>(cluster);
                                             Collections.shuffle(stops, rnd);
@@ -229,8 +229,8 @@ public class GiantTour implements Comparable<GiantTour>, AutoCloseable {
     /**
      * Hands the split procedure the sequence it must walk, under the instance
      * monitor: an individual taking part in a crossover is concurrently
-     * re-split by the generation loop, and {@link #Split(InputData, double)}
-     * swaps {@code Sequence} for the one of a better split. A walk that read
+     * re-split by the generation loop, and {@link #split(InputData, double)}
+     * swaps {@code sequence} for the one of a better split. A walk that read
      * the field on every step would continue over the new permutation and
      * revisit stops it had already routed, since it only filters against the
      * partial solution, producing routes that serve the same stop twice.
@@ -241,7 +241,7 @@ public class GiantTour implements Comparable<GiantTour>, AutoCloseable {
      * @return the sequence to split
      */
     synchronized int[] getSequenceSnapshot() {
-        return this.Sequence;
+        return this.sequence;
     }
 
     /**
@@ -249,19 +249,19 @@ public class GiantTour implements Comparable<GiantTour>, AutoCloseable {
      * @return the stop at the given position
      */
     public int getStop(int i) {
-        return this.Sequence[i];
+        return this.sequence[i];
     }
 
     /**
      * @return the number of stops in the tour
      */
     public int getLength() {
-        return this.Sequence.length;
+        return this.sequence.length;
     }
 
     @Override
     public String toString() {
-        return this.AuxiliaryGraph.toString();
+        return this.auxiliaryGraph.toString();
     }
 
     /**
@@ -269,21 +269,21 @@ public class GiantTour implements Comparable<GiantTour>, AutoCloseable {
      *         if the tour has no feasible split
      */
     public double getFitness() {
-        return this.isFeasible() ? this.AuxiliaryGraph.getLabel() : Double.POSITIVE_INFINITY;
+        return this.isFeasible() ? this.auxiliaryGraph.getLabel() : Double.POSITIVE_INFINITY;
     }
 
     /**
      * @return the number of routes in the best split
      */
     public int getRoutesCount() {
-        return this.AuxiliaryGraph.getRoutesCount();
+        return this.auxiliaryGraph.getRoutesCount();
     }
 
     /**
      * @return {@code true} if the tour has a feasible split into routes
      */
     public boolean isFeasible() {
-        return this.AuxiliaryGraph == null ? false : this.AuxiliaryGraph.isFeasible();
+        return this.auxiliaryGraph == null ? false : this.auxiliaryGraph.isFeasible();
     }
 
     /**
@@ -305,7 +305,7 @@ public class GiantTour implements Comparable<GiantTour>, AutoCloseable {
      *         infeasible
      */
     private String export() {
-        return this.AuxiliaryGraph == null ? "NULL" : this.AuxiliaryGraph.export();
+        return this.auxiliaryGraph == null ? "NULL" : this.auxiliaryGraph.export();
     }
 
     /**
@@ -316,7 +316,7 @@ public class GiantTour implements Comparable<GiantTour>, AutoCloseable {
      * @throws IOException if the output file cannot be written
      */
     public void export(InputData data) throws IOException {
-        String instanceName = new File(data.FileName).getName().replaceFirst("\\.dat$", "");
+        String instanceName = new File(data.fileName).getName().replaceFirst("\\.dat$", "");
         File baseDir = new File("Output");
         File instanceDir = new File(baseDir, instanceName);
         instanceDir.mkdirs();
@@ -336,8 +336,8 @@ public class GiantTour implements Comparable<GiantTour>, AutoCloseable {
      */
     @Override
     public synchronized void close() {
-        if (this.AuxiliaryGraph != null)
-            this.AuxiliaryGraph.close();
-        this.Sequence = null;
+        if (this.auxiliaryGraph != null)
+            this.auxiliaryGraph.close();
+        this.sequence = null;
     }
 }

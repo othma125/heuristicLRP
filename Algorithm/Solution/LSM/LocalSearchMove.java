@@ -10,7 +10,7 @@ import Algorithm.Solution.Solution;
 
 /**
  * Base class for local search moves. A move is defined by two positions
- * ({@code I}, {@code J}) over either one route (intra-route) or two routes
+ * ({@code i}, {@code j}) over either one route (intra-route) or two routes
  * (inter-route), and knows how to evaluate its cost change, test its
  * capacity feasibility, and apply itself. Subclasses implement the specific
  * neighbourhoods: {@link _2Opt}, {@link Swap}, {@link LeftShift},
@@ -20,16 +20,16 @@ import Algorithm.Solution.Solution;
  */
 public abstract class LocalSearchMove {
 
-    final String Name;
-    final boolean OneSequence;
-    final int I, J;
-    final int Border;
-    Route FirstRoute, SecondRoute;
-    double Gain = 0d;
+    final String name;
+    final boolean oneSequence;
+    final int i, j;
+    final int border;
+    Route firstRoute, secondRoute;
+    double gain = 0d;
 
     /**
      * Computes the change in total distance the move would produce and stores
-     * it in {@code Gain} (negative means improving).
+     * it in {@code gain} (negative means improving).
      *
      * @param data the problem instance providing distances
      */
@@ -40,7 +40,7 @@ public abstract class LocalSearchMove {
      *
      * @param data the problem instance providing distances
      */
-    public abstract void Perform(InputData data);
+    public abstract void perform(InputData data);
 
     /**
      * @param data     the problem instance providing demands and capacity
@@ -64,7 +64,7 @@ public abstract class LocalSearchMove {
      * @return {@code true} if the depot can ship it
      */
     boolean hasRoom(Solution solution, Route route, int demand) {
-        if (this.FirstRoute.getDepot().equals(this.SecondRoute.getDepot()))
+        if (this.firstRoute.getDepot().equals(this.secondRoute.getDepot()))
             return true;
         return demand <= (solution == null ? route.getDepot().capacity() : solution.getLeftOver(route));
     }
@@ -80,7 +80,7 @@ public abstract class LocalSearchMove {
      * @return {@code true} if emptying it leaves every opened depot paid for
      */
     boolean keepsDepotPaid(Solution solution, Route route) {
-        if (this.FirstRoute.getDepot().equals(this.SecondRoute.getDepot()) || !route.paysDepotOpening())
+        if (this.firstRoute.getDepot().equals(this.secondRoute.getDepot()) || !route.paysDepotOpening())
             return true;
         return solution == null || solution.closesDepot(route);
     }
@@ -95,18 +95,18 @@ public abstract class LocalSearchMove {
      *         {@code i >= j}, or if more than two routes are given
      */
     LocalSearchMove(String name, int i, int j, Route ... routes) {
-        this.Name = name;
+        this.name = name;
         if(routes.length == 1 && i >= j)
             throw new IllegalArgumentException("i should be smaller than j in LSM");
         if(routes.length > 2)
             throw new IllegalArgumentException("routes number should be equals to 1 or 2 in LSM");
-        this.Gain = 0d;
-        this.I = i;
-        this.J = j;
-        this.OneSequence = routes.length == 1;
-        this.FirstRoute = routes[0];
-        this.SecondRoute = this.OneSequence ? this.FirstRoute : routes[1];
-        this.Border = this.OneSequence ? this.FirstRoute.getLength() : this.SecondRoute.getLength();
+        this.gain = 0d;
+        this.i = i;
+        this.j = j;
+        this.oneSequence = routes.length == 1;
+        this.firstRoute = routes[0];
+        this.secondRoute = this.oneSequence ? this.firstRoute : routes[1];
+        this.border = this.oneSequence ? this.firstRoute.getLength() : this.secondRoute.getLength();
     }
 
     /**
@@ -120,27 +120,27 @@ public abstract class LocalSearchMove {
      * @param seq2 the new sequence of the second route, empty if it disappears
      */
     void rebuild(InputData data, int[] seq1, int[] seq2) {
-        Route first = this.FirstRoute, second = this.SecondRoute;
-        boolean pays_first = first.paysDepotOpening();
-        boolean pays_second = second.paysDepotOpening();
-        boolean same_depot = first.getDepot().equals(second.getDepot());
-        if (same_depot && seq1.length == 0 && pays_first) {
-            pays_first = false;
-            pays_second = true;
+        Route first = this.firstRoute, second = this.secondRoute;
+        boolean paysFirst = first.paysDepotOpening();
+        boolean paysSecond = second.paysDepotOpening();
+        boolean sameDepot = first.getDepot().equals(second.getDepot());
+        if (sameDepot && seq1.length == 0 && paysFirst) {
+            paysFirst = false;
+            paysSecond = true;
         }
-        else if (same_depot && seq2.length == 0 && pays_second) {
-            pays_second = false;
-            pays_first = true;
+        else if (sameDepot && seq2.length == 0 && paysSecond) {
+            paysSecond = false;
+            paysFirst = true;
         }
-        this.FirstRoute = seq1.length > 0 ? new Route(data, first.getDepot(), seq1, pays_first) : null;
-        this.SecondRoute = seq2.length > 0 ? new Route(data, second.getDepot(), seq2, pays_second) : null;
+        this.firstRoute = seq1.length > 0 ? new Route(data, first.getDepot(), seq1, paysFirst) : null;
+        this.secondRoute = seq2.length > 0 ? new Route(data, second.getDepot(), seq2, paysSecond) : null;
     }
 
     /**
      * @return the cost change of the move (negative means improving)
      */
     public double getGain() {
-        return this.Gain;
+        return this.gain;
     }
 
     /**
@@ -148,7 +148,7 @@ public abstract class LocalSearchMove {
      *         emptied it)
      */
     public Route getFirstRoute() {
-        return this.FirstRoute;
+        return this.firstRoute;
     }
 
     /**
@@ -156,6 +156,6 @@ public abstract class LocalSearchMove {
      *         emptied it)
      */
     public Route getSecondRoute() {
-        return this.SecondRoute;
+        return this.secondRoute;
     }
 }

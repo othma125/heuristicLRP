@@ -7,8 +7,8 @@ import Algorithm.Solution.Route;
 import Algorithm.Solution.Solution;
 
 /**
- * Swap move: exchanges the stop at position {@code I} of the first route with
- * the stop at position {@code J} of the second (or the same) route. The two
+ * Swap move: exchanges the stop at position {@code i} of the first route with
+ * the stop at position {@code j} of the second (or the same) route. The two
  * routes may serve different depots, in which case the two stops change depot
  * with the routes that take them.
  *
@@ -16,7 +16,7 @@ import Algorithm.Solution.Solution;
  */
 public class Swap extends LocalSearchMove {
 
-    private final int FirstBorder;
+    private final int firstBorder;
 
     /**
      * @param data   the problem instance
@@ -26,7 +26,7 @@ public class Swap extends LocalSearchMove {
      */
     public Swap(InputData data, int i, int j, Route... routes) {
         super("Swap", i, j, routes);
-        this.FirstBorder = this.FirstRoute.getLength();
+        this.firstBorder = this.firstRoute.getLength();
     }
 
     /** {@inheritDoc} */
@@ -34,65 +34,65 @@ public class Swap extends LocalSearchMove {
     public void setGain(InputData data) {
 
         // --- First route: predecessor of I ---
-        if (this.I == 0) {
-            this.Gain += data.getDepotToStopDistance(this.FirstRoute.getDepot(), this.SecondRoute.getStop(this.J));
-            this.Gain -= data.getDepotToStopDistance(this.FirstRoute.getDepot(), this.FirstRoute.getStop(this.I));
+        if (this.i == 0) {
+            this.gain += data.getDepotToStopDistance(this.firstRoute.getDepot(), this.secondRoute.getStop(this.j));
+            this.gain -= data.getDepotToStopDistance(this.firstRoute.getDepot(), this.firstRoute.getStop(this.i));
         }
         else {
-            this.Gain += data.getTwoStopsDistance(this.FirstRoute.getStop(this.I - 1), this.SecondRoute.getStop(this.J));
-            this.Gain -= data.getTwoStopsDistance(this.FirstRoute.getStop(this.I - 1), this.FirstRoute.getStop(this.I));
+            this.gain += data.getTwoStopsDistance(this.firstRoute.getStop(this.i - 1), this.secondRoute.getStop(this.j));
+            this.gain -= data.getTwoStopsDistance(this.firstRoute.getStop(this.i - 1), this.firstRoute.getStop(this.i));
         }
         // --- Middle part ---
-        if (this.I + 1 < this.J && this.OneSequence) {
-            this.Gain += data.getTwoStopsDistance(this.SecondRoute.getStop(this.J - 1), this.FirstRoute.getStop(this.I));
-            this.Gain -= data.getTwoStopsDistance(this.SecondRoute.getStop(this.J - 1), this.SecondRoute.getStop(this.J));
-            this.Gain += data.getTwoStopsDistance(this.SecondRoute.getStop(this.J), this.FirstRoute.getStop(this.I + 1));
-            this.Gain -= data.getTwoStopsDistance(this.FirstRoute.getStop(this.I), this.FirstRoute.getStop(this.I + 1));
+        if (this.i + 1 < this.j && this.oneSequence) {
+            this.gain += data.getTwoStopsDistance(this.secondRoute.getStop(this.j - 1), this.firstRoute.getStop(this.i));
+            this.gain -= data.getTwoStopsDistance(this.secondRoute.getStop(this.j - 1), this.secondRoute.getStop(this.j));
+            this.gain += data.getTwoStopsDistance(this.secondRoute.getStop(this.j), this.firstRoute.getStop(this.i + 1));
+            this.gain -= data.getTwoStopsDistance(this.firstRoute.getStop(this.i), this.firstRoute.getStop(this.i + 1));
         }
-        else if (!this.OneSequence) {
-            if (this.J > 0) {
-                this.Gain += data.getTwoStopsDistance(this.SecondRoute.getStop(this.J - 1), this.FirstRoute.getStop(this.I));
-                this.Gain -= data.getTwoStopsDistance(this.SecondRoute.getStop(this.J - 1), this.SecondRoute.getStop(this.J));
+        else if (!this.oneSequence) {
+            if (this.j > 0) {
+                this.gain += data.getTwoStopsDistance(this.secondRoute.getStop(this.j - 1), this.firstRoute.getStop(this.i));
+                this.gain -= data.getTwoStopsDistance(this.secondRoute.getStop(this.j - 1), this.secondRoute.getStop(this.j));
             }
             else {
                 // Opening leg of the second route, so measured from the depot serving it.
-                this.Gain += data.getDepotToStopDistance(this.SecondRoute.getDepot(), this.FirstRoute.getStop(this.I));
-                this.Gain -= data.getDepotToStopDistance(this.SecondRoute.getDepot(), this.SecondRoute.getStop(this.J));
+                this.gain += data.getDepotToStopDistance(this.secondRoute.getDepot(), this.firstRoute.getStop(this.i));
+                this.gain -= data.getDepotToStopDistance(this.secondRoute.getDepot(), this.secondRoute.getStop(this.j));
             }
-            if (this.I + 1 < this.FirstBorder) {
-                this.Gain += data.getTwoStopsDistance(this.SecondRoute.getStop(this.J), this.FirstRoute.getStop(this.I + 1));
-                this.Gain -= data.getTwoStopsDistance(this.FirstRoute.getStop(this.I), this.FirstRoute.getStop(this.I + 1));
+            if (this.i + 1 < this.firstBorder) {
+                this.gain += data.getTwoStopsDistance(this.secondRoute.getStop(this.j), this.firstRoute.getStop(this.i + 1));
+                this.gain -= data.getTwoStopsDistance(this.firstRoute.getStop(this.i), this.firstRoute.getStop(this.i + 1));
             }
             else {
-                this.Gain += data.getStopToDepotDistance(this.SecondRoute.getStop(this.J), this.FirstRoute.getDepot());
-                this.Gain -= data.getStopToDepotDistance(this.FirstRoute.getStop(this.I), this.FirstRoute.getDepot());
+                this.gain += data.getStopToDepotDistance(this.secondRoute.getStop(this.j), this.firstRoute.getDepot());
+                this.gain -= data.getStopToDepotDistance(this.firstRoute.getStop(this.i), this.firstRoute.getDepot());
             }
         }
         // --- Successor of J ---
-        if (this.J + 1 < this.Border) {
-            this.Gain += data.getTwoStopsDistance(this.FirstRoute.getStop(this.I), this.SecondRoute.getStop(this.J + 1));
-            this.Gain -= data.getTwoStopsDistance(this.SecondRoute.getStop(this.J), this.SecondRoute.getStop(this.J + 1));
+        if (this.j + 1 < this.border) {
+            this.gain += data.getTwoStopsDistance(this.firstRoute.getStop(this.i), this.secondRoute.getStop(this.j + 1));
+            this.gain -= data.getTwoStopsDistance(this.secondRoute.getStop(this.j), this.secondRoute.getStop(this.j + 1));
         }
         else {
             // Closing leg of the second route, so measured from the depot serving it.
-            this.Gain += data.getStopToDepotDistance(this.FirstRoute.getStop(this.I), this.SecondRoute.getDepot());
-            this.Gain -= data.getStopToDepotDistance(this.SecondRoute.getStop(this.J), this.SecondRoute.getDepot());
+            this.gain += data.getStopToDepotDistance(this.firstRoute.getStop(this.i), this.secondRoute.getDepot());
+            this.gain -= data.getStopToDepotDistance(this.secondRoute.getStop(this.j), this.secondRoute.getDepot());
         }
     }
 
     /** {@inheritDoc} */
     @Override
-    public void Perform(InputData data) {
-        if (this.OneSequence) {
-            this.FirstRoute.Swap(this.I, this.J);
-            this.FirstRoute.Improve(this.Gain);
+    public void perform(InputData data) {
+        if (this.oneSequence) {
+            this.firstRoute.swap(this.i, this.j);
+            this.firstRoute.improve(this.gain);
         }
         else {
-            int[] seq1 = this.FirstRoute.getSequence().clone();
-            int[] seq2 = this.SecondRoute.getSequence().clone();
-            int aux = seq1[this.I];
-            seq1[this.I] = seq2[this.J];
-            seq2[this.J] = aux;
+            int[] seq1 = this.firstRoute.getSequence().clone();
+            int[] seq2 = this.secondRoute.getSequence().clone();
+            int aux = seq1[this.i];
+            seq1[this.i] = seq2[this.j];
+            seq2[this.j] = aux;
             this.rebuild(data, seq1, seq2);
         }
     }
@@ -100,20 +100,20 @@ public class Swap extends LocalSearchMove {
     /** {@inheritDoc} */
     @Override
     public boolean isFeasible(InputData data, Solution solution) {
-        if (this.OneSequence)
+        if (this.oneSequence)
             return true;
-        int transferred = data.getDemand(this.SecondRoute.getStop(this.J)) - data.getDemand(this.FirstRoute.getStop(this.I));
-        int demand1 = this.FirstRoute.getSumDemand() + transferred;
-        int demand2 = this.SecondRoute.getSumDemand() - transferred;
+        int transferred = data.getDemand(this.secondRoute.getStop(this.j)) - data.getDemand(this.firstRoute.getStop(this.i));
+        int demand1 = this.firstRoute.getSumDemand() + transferred;
+        int demand2 = this.secondRoute.getSumDemand() - transferred;
         if (demand1 > data.getCapacity() || demand2 > data.getCapacity())
             return false;
         // Neither route can empty, so the depots only have to have room for what they end
         // up shipping: the heavier stop moving one way is what can overload a depot.
-        return this.hasRoom(solution, this.FirstRoute, demand1) && this.hasRoom(solution, this.SecondRoute, demand2);
+        return this.hasRoom(solution, this.firstRoute, demand1) && this.hasRoom(solution, this.secondRoute, demand2);
     }
 
     @Override
     public String toString() {
-        return this.Name + " (" + this.I + ";" + this.J + ")";
+        return this.name + " (" + this.i + ";" + this.j + ")";
     }
 }

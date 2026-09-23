@@ -37,7 +37,7 @@ public final class BestKnown {
             Map.entry("gaspelle6", "gaskell67-36x5"),
             Map.entry("min27", "min92-27x5"),
             Map.entry("min134", "min92-134x8"));
-    private static Map<String, Double> Costs;
+    private static Map<String, Double> costs;
 
     private BestKnown() {
         // Static accessors only.
@@ -50,14 +50,14 @@ public final class BestKnown {
      *         not listed
      */
     public static synchronized double of(String instance) {
-        if (Costs == null)
-            Costs = read();
+        if (costs == null)
+            costs = read();
         String key = instance.toLowerCase(Locale.ROOT)
                              .replaceFirst("^coord", "")
                              .replaceFirst("\\.dat$", "");
         key = BARRETO_NAMES.getOrDefault(key, key);
         // The Tuzun files carry a P the published table drops.
-        return Costs.getOrDefault(key, Costs.getOrDefault(key.replaceFirst("^p", ""), Double.NaN));
+        return costs.getOrDefault(key, costs.getOrDefault(key.replaceFirst("^p", ""), Double.NaN));
     }
 
     /**

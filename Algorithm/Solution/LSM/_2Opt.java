@@ -16,7 +16,7 @@ import Algorithm.Solution.Solution;
  */
 public class _2Opt extends LocalSearchMove {
 
-    private final int FirstBorder;
+    private final int firstBorder;
 
     /**
      * @param data   the problem instance
@@ -26,63 +26,63 @@ public class _2Opt extends LocalSearchMove {
      */
     public _2Opt(InputData data, int i, int j, Route... routes) {
         super("2Opt", i, j, routes);
-        this.FirstBorder = this.FirstRoute.getLength();
+        this.firstBorder = this.firstRoute.getLength();
     }
 
     /** {@inheritDoc} */
     @Override
     public void setGain(InputData data) {
-        if (this.I == 0) {
-            this.Gain += data.getDepotToStopDistance(this.FirstRoute.getDepot(), this.SecondRoute.getStop(this.J));
-            this.Gain -= data.getDepotToStopDistance(this.FirstRoute.getDepot(), this.FirstRoute.getStop(this.I));
+        if (this.i == 0) {
+            this.gain += data.getDepotToStopDistance(this.firstRoute.getDepot(), this.secondRoute.getStop(this.j));
+            this.gain -= data.getDepotToStopDistance(this.firstRoute.getDepot(), this.firstRoute.getStop(this.i));
         }
         else {
-            this.Gain += data.getTwoStopsDistance(this.FirstRoute.getStop(this.I - 1), this.SecondRoute.getStop(this.J));
-            this.Gain -= data.getTwoStopsDistance(this.FirstRoute.getStop(this.I - 1), this.FirstRoute.getStop(this.I));
+            this.gain += data.getTwoStopsDistance(this.firstRoute.getStop(this.i - 1), this.secondRoute.getStop(this.j));
+            this.gain -= data.getTwoStopsDistance(this.firstRoute.getStop(this.i - 1), this.firstRoute.getStop(this.i));
         }
-        if (this.J + 1 < this.Border) {
-            this.Gain += data.getTwoStopsDistance(this.FirstRoute.getStop(this.I), this.SecondRoute.getStop(this.J + 1));
-            this.Gain -= data.getTwoStopsDistance(this.SecondRoute.getStop(this.J), this.SecondRoute.getStop(this.J + 1));
+        if (this.j + 1 < this.border) {
+            this.gain += data.getTwoStopsDistance(this.firstRoute.getStop(this.i), this.secondRoute.getStop(this.j + 1));
+            this.gain -= data.getTwoStopsDistance(this.secondRoute.getStop(this.j), this.secondRoute.getStop(this.j + 1));
         }
         else {
             // The tail of the first route closes the second one, so it returns to its depot.
-            this.Gain += data.getStopToDepotDistance(this.FirstRoute.getStop(this.I), this.SecondRoute.getDepot());
-            this.Gain -= data.getStopToDepotDistance(this.SecondRoute.getStop(this.J), this.SecondRoute.getDepot());
+            this.gain += data.getStopToDepotDistance(this.firstRoute.getStop(this.i), this.secondRoute.getDepot());
+            this.gain -= data.getStopToDepotDistance(this.secondRoute.getStop(this.j), this.secondRoute.getDepot());
         }
-        if (!this.OneSequence && !this.FirstRoute.getDepot().equals(this.SecondRoute.getDepot())) {
+        if (!this.oneSequence && !this.firstRoute.getDepot().equals(this.secondRoute.getDepot())) {
             // The two routes swap tails, so the end of the first one becomes the start of the
             // second and the start of the second becomes the end of the first: both legs
             // change depot, which only costs anything when the depots differ.
-            int first_last = this.FirstRoute.getLast();
-            int second_first = this.SecondRoute.getStop(0);
-            this.Gain += data.getStopToDepotDistance(first_last, this.SecondRoute.getDepot());
-            this.Gain -= data.getStopToDepotDistance(first_last, this.FirstRoute.getDepot());
-            this.Gain += data.getDepotToStopDistance(this.FirstRoute.getDepot(), second_first);
-            this.Gain -= data.getDepotToStopDistance(this.SecondRoute.getDepot(), second_first);
+            int firstLast = this.firstRoute.getLast();
+            int secondFirst = this.secondRoute.getStop(0);
+            this.gain += data.getStopToDepotDistance(firstLast, this.secondRoute.getDepot());
+            this.gain -= data.getStopToDepotDistance(firstLast, this.firstRoute.getDepot());
+            this.gain += data.getDepotToStopDistance(this.firstRoute.getDepot(), secondFirst);
+            this.gain -= data.getDepotToStopDistance(this.secondRoute.getDepot(), secondFirst);
         }
     }
 
     /** {@inheritDoc} */
     @Override
-    public void Perform(InputData data) {
-        if (this.OneSequence) {
-            this.FirstRoute._2Opt(this.I, this.J);
-            this.FirstRoute.Improve(this.Gain);
+    public void perform(InputData data) {
+        if (this.oneSequence) {
+            this.firstRoute._2Opt(this.i, this.j);
+            this.firstRoute.improve(this.gain);
         }
         else {
-            int[] seq1 = new int[this.I + this.J + 1];
-            for (int i = 0; i < this.I; i++) 
-                seq1[i] = this.FirstRoute.getStop(i);
-            for (int i = 0; i <= this.J; i++) 
-                seq1[i + this.I] = this.SecondRoute.getStop(this.J - i);
-            int[] seq2 = new int[this.SecondRoute.getLength() + this.FirstRoute.getLength() - seq1.length];
+            int[] seq1 = new int[this.i + this.j + 1];
+            for (int i = 0; i < this.i; i++) 
+                seq1[i] = this.firstRoute.getStop(i);
+            for (int i = 0; i <= this.j; i++) 
+                seq1[i + this.i] = this.secondRoute.getStop(this.j - i);
+            int[] seq2 = new int[this.secondRoute.getLength() + this.firstRoute.getLength() - seq1.length];
             int k = 0;
-            for (int i = this.FirstRoute.getLength() - 1; i >= this.I; i--) {
-                seq2[k] = this.FirstRoute.getStop(i);
+            for (int i = this.firstRoute.getLength() - 1; i >= this.i; i--) {
+                seq2[k] = this.firstRoute.getStop(i);
                 k++;
             }
-            for (int i = this.J + 1; i < this.SecondRoute.getLength(); i++) {
-                seq2[k] = this.SecondRoute.getStop(i);
+            for (int i = this.j + 1; i < this.secondRoute.getLength(); i++) {
+                seq2[k] = this.secondRoute.getStop(i);
                 k++;
             }
             this.rebuild(data, seq1, seq2);
@@ -92,32 +92,32 @@ public class _2Opt extends LocalSearchMove {
     /** {@inheritDoc} */
     @Override
     public boolean isFeasible(InputData data, Solution solution) {
-        if (this.OneSequence)
+        if (this.oneSequence)
             return true;
         // Reconnecting sends a whole segment of demand each way at once, so across two
         // depots it rewrites what both of them ship. The neighbourhood is kept inside a
         // single depot, where only the two vehicle loads change.
-        if (!this.FirstRoute.getDepot().equals(this.SecondRoute.getDepot()))
+        if (!this.firstRoute.getDepot().equals(this.secondRoute.getDepot()))
             return false;
-        int available_capacity1 = data.getCapacity();
-        for (int i = 0; i < this.I; i++) 
-            available_capacity1 -= data.getDemand(this.FirstRoute.getStop(i));
-        int sum_demand2 = 0;
-        for (int j = 0; j <= this.J; j++) 
-            sum_demand2 += data.getDemand(this.SecondRoute.getStop(j));
-        if (sum_demand2 > available_capacity1 || available_capacity1 < 0)
+        int availableCapacity1 = data.getCapacity();
+        for (int i = 0; i < this.i; i++) 
+            availableCapacity1 -= data.getDemand(this.firstRoute.getStop(i));
+        int sumDemand2 = 0;
+        for (int j = 0; j <= this.j; j++) 
+            sumDemand2 += data.getDemand(this.secondRoute.getStop(j));
+        if (sumDemand2 > availableCapacity1 || availableCapacity1 < 0)
             return false;
-        int available_capacity2 = data.getCapacity();
-        for (int j = this.J + 1; j < this.Border; j++) 
-            available_capacity2 -= data.getDemand(this.SecondRoute.getStop(j));
-        int sum_demand1 = 0;
-        for (int i = this.I; i < this.FirstBorder; i++) 
-            sum_demand1 += data.getDemand(this.FirstRoute.getStop(i));
-        return sum_demand1 <= available_capacity2;
+        int availableCapacity2 = data.getCapacity();
+        for (int j = this.j + 1; j < this.border; j++) 
+            availableCapacity2 -= data.getDemand(this.secondRoute.getStop(j));
+        int sumDemand1 = 0;
+        for (int i = this.i; i < this.firstBorder; i++) 
+            sumDemand1 += data.getDemand(this.firstRoute.getStop(i));
+        return sumDemand1 <= availableCapacity2;
     }
 
     @Override
     public String toString() {
-        return this.Name + " (" + this.I + ";" + this.J + ")";
+        return this.name + " (" + this.i + ";" + this.j + ")";
     }
 }

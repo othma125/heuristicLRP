@@ -2,159 +2,147 @@
 
 package Algorithm.Solution;
 
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.locks.ReentrantLock;
 
 import Algorithm.Data.InputData;
 
 /**
  * A node of the {@link AuxiliaryGraph}, representing a position in the giant
- * tour. Each node holds the partial solutions (labels) reaching it; the
- * cheapest label of the last node is the split. A label is kept when it beats
- * the node on either of two minimised objectives, its cost or its leftover
- * depot room, so the node ends up holding a trade-off front rather than a
- * single best; {@link #getParetoSet()} extracts the non-dominated part of it.
- * Label updates are guarded by a {@link ReentrantLock} because the graph is
- * built concurrently.
+ * tour. Each node holds the best partial solution derived from each distinct
+ * predecessor label reaching it, keyed by that predecessor in
+ * {@link #solutions}; the cheapest label of the last node is the split. A
+ * label is kept when it beats the predecessor's current entry on either of two
+ * minimised objectives, its cost or its leftover depot room, so the node ends
+ * up holding a trade-off front rather than a single best; {@link #getParetoSet()}
+ * extracts the non-dominated part of it. Label updates are guarded by a
+ * {@link ReentrantLock} because the graph is built concurrently.
  *
  * @author Othmane EL YAAKOUBI
  */
 public class AuxiliaryGraphNode implements AutoCloseable {
 
-    private final List<Solution> Solutions = new LinkedList<>();
-    // Cached because every relaxation tests against it, and recomputing would walk
-    // every solution held here.
-    private int BestLeftOver = Integer.MAX_VALUE;
-    final ReentrantLock Lock = new ReentrantLock();
-    final int NodeIndex;
+    private final Map<Solution, Solution> solutions = new HashMap<>();
+    final ReentrantLock lock = new ReentrantLock();
+    final int nodeIndex;
 
     /**
-     * @param NodeIndex the position of this node in the giant tour
+     * @param nodeIndex the position of this node in the giant tour
      */
-    AuxiliaryGraphNode(int NodeIndex) {
-        this.NodeIndex = NodeIndex;
+    AuxiliaryGraphNode(int nodeIndex) {
+        this.nodeIndex = nodeIndex;
     }
 
     /**
-     * Relaxes this node with a solution formed by extending {@code old_solution}
+     * Relaxes this node with a solution formed by extending {@code oldSolution}
      * with one new route, keeping it when it improves either the node's label or
      * its leftover depot room.
      *
-     * @param old_solution the partial solution reaching the predecessor node,
+     * @param oldSolution the partial solution reaching the predecessor node,
      *                     or {@code null} for the source
-     * @param new_route    the route appended to reach this node
+     * @param newRoute    the route appended to reach this node
      * @return {@code true} if the node was already reachable when an improving
      *         label was accepted
      */
-    boolean UpdateLabel(Solution old_solution, Route new_route) {
-        if (new_route == null)
+    boolean updateLabel(Solution oldSolution, Route newRoute) {
+        if (newRoute == null)
             return false;
         boolean c = false;
-        this.Lock.lock();
+        this.lock.lock();
         try {
-            double label = (old_solution == null ? 0d : old_solution.getTotalDistance()) + new_route.getTraveledDistance();
-            int leftover = old_solution == null ? new_route.getDepot().capacity() - new_route.getSumDemand()
-                                                : old_solution.getLeftoverLoadAfter(null, new_route);
-            if (label < this.getLabel() || leftover < this.getLeftoverLoad()) {
-                c = this.getLabel() < Double.POSITIVE_INFINITY;
-                Solution newSolution = new Solution(label, old_solution == null ? 1 : old_solution.getRoutesCount() + 1);
-                if(old_solution != null)
-                    for(Route route : old_solution.getRoutes())
+            double label = (oldSolution == null ? 0d : oldSolution.getTotalDistance()) + newRoute.getTraveledDistance();
+            int leftover = oldSolution == null ? newRoute.getDepot().capacity() - newRoute.getSumDemand()
+                                                : oldSolution.getLeftoverLoadAfter(null, newRoute);
+            if (label < this.getLabel(oldSolution) || leftover < this.getLeftoverLoad(oldSolution)) {
+                c = this.isFeasible();
+                Solution newSolution = new Solution(label, oldSolution == null ? 1 : oldSolution.getRoutesCount() + 1);
+                if(oldSolution != null)
+                    for(Route route : oldSolution.getRoutes())
                         newSolution.add(route);
-                newSolution.add(new_route);
-                this.keep(newSolution, label < this.getLabel());
+                newSolution.add(newRoute);
+                this.solutions.put(oldSolution, newSolution);
             }
         } finally {
-            this.Lock.unlock();
+            this.lock.unlock();
         }
         return c;
     }
 
     /**
-     * Relaxes this node with a solution obtained by replacing {@code old_route}
-     * with {@code new_route} in {@code old_solution}, keeping it if it improves
+     * Relaxes this node with a solution obtained by replacing {@code oldRoute}
+     * with {@code newRoute} in {@code oldSolution}, keeping it if it improves
      * either the cost or the leftover depot room.
      *
-     * @param old_solution the partial solution to derive from
-     * @param old_route    the route being replaced
-     * @param new_route    the replacement route
+     * @param oldSolution the partial solution to derive from
+     * @param oldRoute    the route being replaced
+     * @param newRoute    the replacement route
      * @return {@code true} if the node was already reachable when an improving
      *         label was accepted
      */
-    boolean UpdateLabel(Solution old_solution, Route old_route, Route new_route) {
-        if (new_route == null)
+    boolean updateLabel(Solution oldSolution, Route oldRoute, Route newRoute) {
+        if (newRoute == null)
             return false;
         boolean c = false;
-        this.Lock.lock();
+        this.lock.lock();
         try {
-            double label = old_solution.getTotalDistance() - old_route.getTraveledDistance() + new_route.getTraveledDistance();
-            if (label < this.getLabel() || old_solution.getLeftoverLoadAfter(old_route, new_route) < this.getLeftoverLoad()) {
-                c = this.getLabel() < Double.POSITIVE_INFINITY;
-                Solution newSolution = new Solution(label, old_solution.getRoutesCount());
-                for (Route route : old_solution.getRoutes())
-                    newSolution.add(route == old_route ? new_route : route);
-                this.keep(newSolution, label < this.getLabel());
+            double label = oldSolution.getTotalDistance() - oldRoute.getTraveledDistance() + newRoute.getTraveledDistance();
+            if (label < this.getLabel(oldSolution) || oldSolution.getLeftoverLoadAfter(oldRoute, newRoute) < this.getLeftoverLoad(oldSolution)) {
+                c = this.isFeasible();
+                Solution newSolution = new Solution(label, oldSolution.getRoutesCount());
+                for (Route route : oldSolution.getRoutes())
+                    newSolution.add(route == oldRoute ? newRoute : route);
+                this.solutions.put(oldSolution, newSolution);
             }
         } finally {
-            this.Lock.unlock();
+            this.lock.unlock();
         }
         return c;
     }
 
     /**
-     * Relaxes this node with a solution that replaces {@code old_route} with
+     * Relaxes this node with a solution that replaces {@code oldRoute} with
      * two routes (the result of an inter-route move that splits into two),
      * keeping it if it improves either the cost or the leftover depot room.
      * Delegates to the single-route overload when one of the routes is
      * {@code null}.
      *
      * @param data         the problem instance
-     * @param old_solution the partial solution to derive from
-     * @param old_route    the route being replaced
+     * @param oldSolution the partial solution to derive from
+     * @param oldRoute    the route being replaced
      * @param route1       the first replacement route (may be {@code null})
      * @param route2       the second replacement route (may be {@code null})
      */
-    void UpdateLabel(InputData data, Solution old_solution, Route old_route, Route route1, Route route2) {
+    void updateLabel(InputData data, Solution oldSolution, Route oldRoute, Route route1, Route route2) {
         if (route1 == null) {
-            this.UpdateLabel(old_solution, old_route, route2);
+            this.updateLabel(oldSolution, oldRoute, route2);
             return;
         }
         else if (route2 == null) {
-            this.UpdateLabel(old_solution, old_route, route1);
+            this.updateLabel(oldSolution, oldRoute, route1);
             return;
         }
-        this.Lock.lock();
+        this.lock.lock();
         try {
-            double label = old_solution.getTotalDistance() - old_route.getTraveledDistance() + route1.getTraveledDistance() + route2.getTraveledDistance();
-            if (label < this.getLabel() || old_solution.getLeftoverLoadAfter(old_route, route1, route2) < this.getLeftoverLoad()) {
-                Solution newSolution = new Solution(label, old_solution.getRoutesCount() + 1);
-                for (Route route : old_solution.getRoutes()) 
-                    if (route != old_route) 
+            double label = oldSolution.getTotalDistance() - oldRoute.getTraveledDistance() + route1.getTraveledDistance() + route2.getTraveledDistance();
+            if (label < this.getLabel(oldSolution) || oldSolution.getLeftoverLoadAfter(oldRoute, route1, route2) < this.getLeftoverLoad(oldSolution)) {
+                Solution newSolution = new Solution(label, oldSolution.getRoutesCount() + 1);
+                for (Route route : oldSolution.getRoutes()) 
+                    if (route != oldRoute) 
                         newSolution.add(route);
                 newSolution.add(route1);
                 newSolution.add(route2);
-                this.keep(newSolution, label < this.getLabel());
+                this.solutions.put(oldSolution, newSolution);
             }
         } finally {
-            this.Lock.unlock();
+            this.lock.unlock();
         }
-    }
-
-    /**
-     * Files an accepted solution and keeps the cached leftover in step. Improving
-     * labels go to the front so the cheapest solution is found first.
-     *
-     * @param solution  the accepted solution
-     * @param improving whether it beats the node's current label
-     */
-    private void keep(Solution solution, boolean improving) {
-        if (improving)
-            this.Solutions.addFirst(solution);
-        else
-            this.Solutions.add(solution);
-        this.BestLeftOver = Math.min(this.BestLeftOver, solution.getLeftoverLoad());
     }
 
     /**
@@ -162,7 +150,34 @@ public class AuxiliaryGraphNode implements AutoCloseable {
      *         {@link Integer#MAX_VALUE} if none does
      */
     int getLeftoverLoad() {
-        return this.BestLeftOver;
+        return this.isFeasible() ? this.getBestLeftover().getLeftoverLoad() : Integer.MAX_VALUE;
+    }
+
+    /**
+     * @param oldSolution the predecessor label whose map entry is looked up
+     * @return the cost of the label derived from {@code oldSolution}, or
+     *         {@link Double#POSITIVE_INFINITY} if the map holds no such key
+     */
+    double getLabel(Solution oldSolution) {
+        Solution solution = this.solutions.get(oldSolution);
+        return solution == null ? Double.POSITIVE_INFINITY : solution.getTotalDistance();
+    }
+
+    /**
+     * @param oldSolution the predecessor label whose map entry is looked up
+     * @return the leftover load of the label derived from {@code oldSolution},
+     *         or {@link Integer#MAX_VALUE} if the map holds no such key
+     */
+    int getLeftoverLoad(Solution oldSolution) {
+        Solution solution = this.solutions.get(oldSolution);
+        return solution == null ? Integer.MAX_VALUE : solution.getLeftoverLoad();
+    }
+
+    /**
+     * @return the solution reaching this node with the lowest leftover load
+     */
+    private Solution getBestLeftover() {
+        return Collections.min(this.solutions.values(), Comparator.comparingInt(Solution::getLeftoverLoad));
     }
 
     /**
@@ -173,19 +188,20 @@ public class AuxiliaryGraphNode implements AutoCloseable {
      * @return the Pareto-optimal solutions, cheapest first
      */
     List<Solution> getParetoSet() {
-        List<Solution> pareto = new LinkedList<>();
-        this.Lock.lock();
+        LinkedList<Solution> pareto = new LinkedList<>();
+        this.lock.lock();
         try {
-            this.Solutions.sort(Comparator.comparingInt(Solution::getLeftoverLoad)
-                                          .thenComparingDouble(Solution::getTotalDistance));
-            double best_distance = Double.POSITIVE_INFINITY;
-            for (Solution solution : this.Solutions)
-                if (solution.getTotalDistance() < best_distance) {
+            List<Solution> sorted = new ArrayList<>(this.solutions.values());
+            sorted.sort(Comparator.comparingInt(Solution::getLeftoverLoad)
+                                  .thenComparingDouble(Solution::getTotalDistance));
+            double bestDistance = Double.POSITIVE_INFINITY;
+            for (Solution solution : sorted)
+                if (solution.getTotalDistance() < bestDistance) {
                     pareto.addFirst(solution);
-                    best_distance = solution.getTotalDistance();
+                    bestDistance = solution.getTotalDistance();
                 }
         } finally {
-            this.Lock.unlock();
+            this.lock.unlock();
         }
         return pareto;
     }
@@ -194,25 +210,22 @@ public class AuxiliaryGraphNode implements AutoCloseable {
      * @return the current best (lowest-cost) solution reaching this node
      */
     Solution getBestSolution() {
-        Solution best = null;
-        for (Solution solution : this.getSolutions()) 
-            if (best == null || solution.getTotalDistance() < best.getTotalDistance()) 
-                best = solution;
-        return best;
+        return Collections.min(this.solutions.values(), Comparator.comparingDouble(Solution::getTotalDistance));
     }
 
     /**
-     * @return all candidate solutions currently held at this node
+     * @return all candidate solutions currently held at this node, one per
+     *         predecessor label
      */
-    List<Solution> getSolutions() {
-        return this.Solutions;
+    Collection<Solution> getSolutions() {
+        return this.solutions.values();
     }
 
     /**
      * @return {@code true} if at least one solution reaches this node
      */
     boolean isFeasible() {
-         return !this.Solutions.isEmpty();
+         return !this.solutions.isEmpty();
     }
 
     @Override
@@ -256,11 +269,11 @@ public class AuxiliaryGraphNode implements AutoCloseable {
     int[] getNewSequence(InputData data) {
         if (this.isFeasible()) {
             int[] seq = null;
-            this.Lock.lock();
+            this.lock.lock();
             try {
                 seq = this.getBestSolution().getNewSequence();
             } finally {
-                this.Lock.unlock();
+                this.lock.unlock();
             }
             return seq;
         }
@@ -269,18 +282,17 @@ public class AuxiliaryGraphNode implements AutoCloseable {
 
     /**
      * Releases the node by closing all of its solutions and clearing the list.
-     * Guarded by the node {@link #Lock} since the graph is built concurrently.
+     * Guarded by the node {@link #lock} since the graph is built concurrently.
      */
     @Override
     public void close() {
-        this.Lock.lock();
+        this.lock.lock();
         try {
-            for (Solution solution : this.Solutions)
+            for (Solution solution : this.solutions.values())
                 solution.close();
-            this.Solutions.clear();
-            this.BestLeftOver = Integer.MAX_VALUE;
+            this.solutions.clear();
         } finally {
-            this.Lock.unlock();
+            this.lock.unlock();
         }
     }
 }

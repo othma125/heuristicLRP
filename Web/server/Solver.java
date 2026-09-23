@@ -113,9 +113,9 @@ final class Solver {
         try {
             try (InputData data = new InputData(instance.getPath().replace("\\", "/"))) {
                 GeneticAlgorithm algo = new GeneticAlgorithm(data);
-                algo.Log = new PrintStream(new SseLineStream(out), true, StandardCharsets.UTF_8);
+                algo.log = new PrintStream(new SseLineStream(out), true, StandardCharsets.UTF_8);
                 this.running.put(id, algo);
-                algo.Run();
+                algo.run();
 
                 if (algo.isFeasible()) {
                     GiantTour gt = algo.getBestGiantTour();
@@ -159,7 +159,7 @@ final class Solver {
      * @return the solution file handle
      */
     private static File solutionFile(InputData data, double fitness) {
-        String name = new File(data.FileName).getName().replaceFirst("\\.dat$", "");
+        String name = new File(data.fileName).getName().replaceFirst("\\.dat$", "");
         File dir = new File(OUTPUT_DIR, name);
         return new File(dir, "Instance = " + name + " Cost = " + (int) fitness + ".sol");
     }

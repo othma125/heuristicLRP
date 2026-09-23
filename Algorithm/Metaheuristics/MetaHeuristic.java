@@ -18,63 +18,63 @@ import Algorithm.Solution.GiantTour;
  * Base class for metaheuristic solvers. Holds the problem instance, tracks the
  * best giant tour found and the time it was reached, and derives a
  * stagnation-based minimum running time from the instance size. Concrete
- * solvers implement {@link #Run()}.
+ * solvers implement {@link #run()}.
  *
  * @author Othmane EL YAAKOUBI
  */
 public abstract class MetaHeuristic {
-    InputData Data;
-    long StartTime;// Start Time in milliseconds
-    long EndTime;
-    long BestSolutionReachingTime;
-    private GiantTour BestGiantTour = null;
-    private final ReentrantLock BestLock = new ReentrantLock();
-    public final long StagnationMinTime;
+    InputData data;
+    long startTime;// Start Time in milliseconds
+    long endTime;
+    long bestSolutionReachingTime;
+    private GiantTour bestGiantTour = null;
+    private final ReentrantLock bestLock = new ReentrantLock();
+    public final long stagnationMinTime;
 
     /**
      * Where the search reports progress. Defaults to the process standard output;
      * the web server points it at the requesting client's event stream so that
      * concurrent runs never share one log.
      */
-    public PrintStream Log = System.out;
+    public PrintStream log = System.out;
 
     /** Incumbent trace: one {time_ms_since_StartTime, cost} pair per improvement. */
-    public final List<long[]> Trace = Collections.synchronizedList(new ArrayList<>());
+    public final List<long[]> trace = Collections.synchronizedList(new ArrayList<>());
 
 
     /**
      * @param data the problem instance to solve
      */
     public MetaHeuristic(InputData data) {
-        this.Data = data;
-        this.StagnationMinTime = (long) Math.max(100, 100 * Math.sqrt(data.getSize()));
+        this.data = data;
+        this.stagnationMinTime = (long) Math.max(100, 100 * Math.sqrt(data.getSize()));
     }
 
     /**
-     * Records {@code new_gt} as the incumbent if it improves on the current
+     * Records {@code newGt} as the incumbent if it improves on the current
      * best, updating the best-reaching timestamp and logging the improvement.
-     * Guarded by {@link #BestLock} so the concurrent crossovers cannot interleave
+     * Guarded by {@link #bestLock} so the concurrent crossovers cannot interleave
      * the comparison with the update.
      *
-     * @param new_gt a candidate giant tour
+     * @param newGt a candidate giant tour
      * @return {@code true} if the incumbent was replaced
      */
-    public boolean setBestSolution(GiantTour new_gt) {
-        if (new_gt == null)
+    public boolean setBestSolution(GiantTour newGt) {
+        if (newGt == null)
             return false;
-        this.BestLock.lock();
+        this.bestLock.lock();
         try {
-            if (this.BestGiantTour == null || new_gt == this.BestGiantTour || new_gt.compareTo(this.BestGiantTour) < 0) {
-                this.BestSolutionReachingTime = System.currentTimeMillis();
-                this.BestGiantTour = new_gt;
-                this.Log.println(String.format(Locale.US, "%.2f", this.BestGiantTour.getFitness())
-                        + " after " + (this.BestSolutionReachingTime - this.StartTime) + " ms");
-                this.Trace.add(new long[]{this.BestSolutionReachingTime - this.StartTime, (long) this.BestGiantTour.getFitness()});
+            if (this.bestGiantTour == null || newGt == this.bestGiantTour || newGt.compareTo(this.bestGiantTour) < 0) {
+                this.bestSolutionReachingTime = System.currentTimeMillis();
+                this.bestGiantTour = newGt;
+                this.log.println(String.format(Locale.US, "%.2f", this.bestGiantTour.getFitness())
+                        + " after " + (this.bestSolutionReachingTime - this.startTime) + " ms");
+                this.trace.add(new long[]{this.bestSolutionReachingTime - this.startTime, (long) this.bestGiantTour.getFitness()});
                 return true;
             }
             return false;
         } finally {
-            this.BestLock.unlock();
+            this.bestLock.unlock();
         }
     }
 
@@ -82,21 +82,21 @@ public abstract class MetaHeuristic {
      * @return the best giant tour found so far, or {@code null} if none
      */
     public GiantTour getBestGiantTour() {
-        return this.BestGiantTour;
+        return this.bestGiantTour;
     }
 
     /**
      * @return {@code true} if a feasible solution has been found
      */
     public boolean isFeasible() {
-        return this.BestGiantTour != null;
+        return this.bestGiantTour != null;
     }
 
     /**
      * @return the total running time in milliseconds
      */
     public long getRunningTime() {
-        return this.EndTime;
+        return this.endTime;
     }
 
     /**
@@ -105,35 +105,35 @@ public abstract class MetaHeuristic {
      * instead of finishing the current giant tour first.
      */
     public void requestStop() {
-        this.Data.requestStop();
+        this.data.requestStop();
     }
 
     /**
      * @return {@code true} once {@link #requestStop()} has been called
      */
     protected boolean isStopRequested() {
-        return this.Data.isStopRequested();
+        return this.data.isStopRequested();
     }
 
     /**
      * Stagnation-based stopping rule: always continues while the last
-     * improvement is within {@code StagnationMinTime}, then continues with a
+     * improvement is within {@code stagnationMinTime}, then continues with a
      * probability that decays as the stagnation stretch grows relative to the
      * total elapsed time.
      *
      * @return {@code true} if the search should keep running
      */
     protected boolean nonStopCondition() {
-        long current_time = System.currentTimeMillis();
-        if (current_time - this.BestSolutionReachingTime <= this.StagnationMinTime)
+        long currentTime = System.currentTimeMillis();
+        if (currentTime - this.bestSolutionReachingTime <= this.stagnationMinTime)
             return true;
-        double probability = current_time - this.BestSolutionReachingTime - this.StagnationMinTime;
-        probability /= (double) (current_time - this.StartTime);
+        double probability = currentTime - this.bestSolutionReachingTime - this.stagnationMinTime;
+        probability /= (double) (currentTime - this.startTime);
         return ThreadLocalRandom.current().nextDouble() > probability;
     }
 
     /**
      * Runs the metaheuristic to completion.
      */
-    public abstract void Run();
+    public abstract void run();
 }

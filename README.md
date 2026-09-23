@@ -120,7 +120,7 @@ therefore not interchangeable: the one that packs its depots tighter has paid fe
 costs for the demand it ships, and the one that costs more may still be the only one able to
 absorb the rest of the tour. Only the **Pareto set** of a node (`AuxiliaryGraphNode.getParetoSet()`,
 non-dominated on both objectives) is extended into new arcs, local-searched at the sink, and
-re-split by the crossover; dominated labels are held but never grown. `Solution.LeftoverLoad`
+re-split by the crossover; dominated labels are held but never grown. `Solution.leftoverLoad`
 tracks the value incrementally as routes are added, so it is an upper bound once a depot takes
 a second route — a filter that errs towards keeping labels.
 

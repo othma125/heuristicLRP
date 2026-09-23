@@ -66,7 +66,7 @@ public class benchmark {
                                                         }
                                                     })
                                                     .filter(data -> data != null)
-                                                    .collect(Collectors.toMap(data -> instanceName(data.FileName), data -> data));
+                                                    .collect(Collectors.toMap(data -> instanceName(data.fileName), data -> data));
 
             // Process in sorted order
             datasets.entrySet()
@@ -75,7 +75,7 @@ public class benchmark {
                     .forEach(entry -> {
                         InputData data = entry.getValue();
                         MetaHeuristic algorithm = new GeneticAlgorithm(data);
-                        algorithm.Run();
+                        algorithm.run();
                         totalRunTime[0] += algorithm.getRunningTime();
                         if (algorithm.isFeasible()) {
                             GiantTour gt = algorithm.getBestGiantTour();
@@ -88,7 +88,7 @@ public class benchmark {
                             System.out.println("\nEnd Time = " + algorithm.getRunningTime() + " ms\n");
 
                             // Print/display solution
-                            long end_time = algorithm.getRunningTime();
+                            long endTime = algorithm.getRunningTime();
                             // Lookup best known
                             double best = BestKnown.of(entry.getKey());
 
@@ -99,10 +99,10 @@ public class benchmark {
                                 gapStr = String.format(Locale.US, "%.2f", gap  * 100d);
                             }
                             // Write result to CSV
-                            writer.printf(Locale.US, "%s,%s,%s,%s,%.2f,%s,%s\n", entry.getKey(), data.getCustomerNumber(), data.getDepotNumber(), end_time, gt.getFitness(), Double.toString(best), gapStr);
+                            writer.printf(Locale.US, "%s,%s,%s,%s,%.2f,%s,%s\n", entry.getKey(), data.getCustomerNumber(), data.getDepotNumber(), endTime, gt.getFitness(), Double.toString(best), gapStr);
                         }
                         else {
-                            System.out.println("No feasible solution found for " + data.FileName);
+                            System.out.println("No feasible solution found for " + data.fileName);
                             System.out.println();
                         }
                     });

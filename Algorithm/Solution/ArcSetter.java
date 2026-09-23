@@ -27,10 +27,10 @@ import Algorithm.Solution.LSM.LocalSearchMove;
 public class ArcSetter extends RecursiveAction {
 
     private final AuxiliaryGraph graph;
-    final AuxiliaryGraphNode StartingNode;
-    final int[] Tour;
-    final Solution Solution;
-    volatile int NodeProcessingWith;
+    final AuxiliaryGraphNode startingNode;
+    final int[] tour;
+    final Solution solution;
+    volatile int nodeProcessingWith;
 
     /**
      * @param graph   the auxiliary graph this setter belongs to
@@ -40,10 +40,10 @@ public class ArcSetter extends RecursiveAction {
      */
     ArcSetter(AuxiliaryGraph graph, AuxiliaryGraphNode node, Solution solution, int[] tour) {
         this.graph = graph;
-        this.StartingNode = node;
-        this.Solution = solution;
-        this.Tour = tour;
-        this.NodeProcessingWith = this.StartingNode.NodeIndex;
+        this.startingNode = node;
+        this.solution = solution;
+        this.tour = tour;
+        this.nodeProcessingWith = this.startingNode.nodeIndex;
     }
 
     /**
@@ -56,10 +56,10 @@ public class ArcSetter extends RecursiveAction {
     @Override
     protected void compute() {
         try {
-            int i = this.StartingNode.NodeIndex;
-            int j = this.StartingNode.NodeIndex;
+            int i = this.startingNode.nodeIndex;
+            int j = this.startingNode.nodeIndex;
             int length = 0;
-            int cumulative_demand = 0;
+            int cumulativeDemand = 0;
             // The walk grows this buffer and copies it out per candidate route: an int[]
             // keeps the accumulation free of boxing and makes reading the stop just added
             // an array access instead of a linked list traversal.
@@ -69,28 +69,28 @@ public class ArcSetter extends RecursiveAction {
             // The solution's routes do not change while this setter walks the tour, so the list
             // is taken once. It is shuffled because the scan below stops at the first improving
             // merge, and a fixed order would always try the same routes first.
-            final List<Route> solution_routes = this.Solution == null ? new LinkedList<>() : this.Solution.getRoutes();
-            Collections.shuffle(solution_routes, ThreadLocalRandom.current());
+            final List<Route> solutionRoutes = this.solution == null ? new LinkedList<>() : this.solution.getRoutes();
+            Collections.shuffle(solutionRoutes, ThreadLocalRandom.current());
             // Setters already queued in the pool when the stop arrived would otherwise each
             // walk the whole tour running local search, so the walk checks the flag too.
             while (i < this.graph.getLength() && !this.graph.getData().isStopRequested()) {
                 length++;
-                AuxiliaryGraphNode EndingNode = this.graph.getNode(++i);
-                if (this.Solution != null && this.Solution.getTotalDistance() >= EndingNode.getLabel()) {
-                    this.NodeProcessingWith++;
-                    this.graph.setNewSetters(EndingNode);
+                AuxiliaryGraphNode endingNode = this.graph.getNode(++i);
+                if (this.solution != null && this.solution.getTotalDistance() >= endingNode.getLabel()) {
+                    this.nodeProcessingWith++;
+                    this.graph.setNewSetters(endingNode);
                     continue;
                 }
                 while (size < length) {
-                    int stop = this.Tour[j++ % this.graph.getLength()];
-                    if (this.Solution == null || !this.Solution.contains(stop)) {
-                        cumulative_demand += this.graph.getData().getDemand(stop);
+                    int stop = this.tour[j++ % this.graph.getLength()];
+                    if (this.solution == null || !this.solution.contains(stop)) {
+                        cumulativeDemand += this.graph.getData().getDemand(stop);
                         if (size == sequence.length)
                             sequence = Arrays.copyOf(sequence, 2 * size);
                         sequence[size++] = stop;
                     }
                 }
-                int[] sequence_as_array = Arrays.copyOf(sequence, size);
+                int[] sequenceAsArray = Arrays.copyOf(sequence, size);
                 // The same stop sequence gives a different cost from every depot, so one
                 // candidate route is grown per candidate depot and the node keeps the best.
                 // ponytail: the constructor calls setCost, an O(length) walk per depot. Close
@@ -100,64 +100,64 @@ public class ArcSetter extends RecursiveAction {
                 // walks the whole sequence to cost it.
                 Map<Depot, Route> candidates = new HashMap<>(depots.length, 1f);
                 for (Depot depot : depots) {
-                    if (cumulative_demand > this.leftOver(depot))
+                    if (cumulativeDemand > this.leftOver(depot))
                         continue;
-                    Route candidate = new Route(this.graph.getData(), this.Solution, depot, sequence_as_array.clone());
+                    Route candidate = new Route(this.graph.getData(), this.solution, depot, sequenceAsArray.clone());
                     candidates.put(depot, candidate);
-                    if (cumulative_demand <= this.graph.getData().getCapacity()
-                        && !EndingNode.UpdateLabel(this.Solution, candidate)) {
-                        candidate.IntraRoutesLocalSearch(this.graph.getData());
-                        EndingNode.UpdateLabel(this.Solution, candidate);
+                    if (cumulativeDemand <= this.graph.getData().getCapacity()
+                        && !endingNode.updateLabel(this.solution, candidate)) {
+                        candidate.intraRoutesLocalSearch(this.graph.getData());
+                        endingNode.updateLabel(this.solution, candidate);
                     }
                 }
-                for (Route old_route : solution_routes) {
-                    final int combined_demand = old_route.getSumDemand() + cumulative_demand;
+                for (Route oldRoute : solutionRoutes) {
+                    final int combinedDemand = oldRoute.getSumDemand() + cumulativeDemand;
                     // Extending a route leaves its depot serving the new stops as well, so the
                     // depot has to have room for them on top of everything it already ships.
-                    final boolean depot_has_room = cumulative_demand <= this.leftOver(old_route.getDepot());
-                    if (combined_demand <= this.graph.getData().getCapacity() && depot_has_room) {
-                        int[] combined_sequence1 = new int[old_route.getLength() + length];
-                        System.arraycopy(old_route.getSequence(), 0, combined_sequence1, 0, old_route.getLength());
-                        System.arraycopy(sequence_as_array, 0, combined_sequence1, old_route.getLength(), length);
-                        // The combined route takes the place of old_route, so it takes over its
+                    final boolean depotHasRoom = cumulativeDemand <= this.leftOver(oldRoute.getDepot());
+                    if (combinedDemand <= this.graph.getData().getCapacity() && depotHasRoom) {
+                        int[] combinedSequence1 = new int[oldRoute.getLength() + length];
+                        System.arraycopy(oldRoute.getSequence(), 0, combinedSequence1, 0, oldRoute.getLength());
+                        System.arraycopy(sequenceAsArray, 0, combinedSequence1, oldRoute.getLength(), length);
+                        // The combined route takes the place of oldRoute, so it takes over its
                         // share of the depot opening cost rather than paying it a second time.
-                        Route combined_route1 = new Route(this.graph.getData(), old_route.getDepot(),
-                                                          combined_sequence1, old_route.paysDepotOpening());
-                        if (!EndingNode.UpdateLabel(this.Solution, old_route, combined_route1)) {
-                            combined_route1.IntraRoutesLocalSearch(this.graph.getData());
-                            EndingNode.UpdateLabel(this.Solution, old_route, combined_route1);
+                        Route combinedRoute1 = new Route(this.graph.getData(), oldRoute.getDepot(),
+                                                          combinedSequence1, oldRoute.paysDepotOpening());
+                        if (!endingNode.updateLabel(this.solution, oldRoute, combinedRoute1)) {
+                            combinedRoute1.intraRoutesLocalSearch(this.graph.getData());
+                            endingNode.updateLabel(this.solution, oldRoute, combinedRoute1);
                         }
-                        int[] combined_sequence2 = new int[old_route.getLength() + length];
-                        System.arraycopy(sequence_as_array, 0, combined_sequence2, 0, length);
-                        System.arraycopy(old_route.getSequence(), 0, combined_sequence2, length, old_route.getLength());
-                        Route combined_route2 = new Route(this.graph.getData(), old_route.getDepot(),
-                                                          combined_sequence2, old_route.paysDepotOpening());
-                        if (!EndingNode.UpdateLabel(this.Solution, old_route, combined_route2)) {
-                            combined_route2.IntraRoutesLocalSearch(this.graph.getData());
-                            EndingNode.UpdateLabel(this.Solution, old_route, combined_route2);
+                        int[] combinedSequence2 = new int[oldRoute.getLength() + length];
+                        System.arraycopy(sequenceAsArray, 0, combinedSequence2, 0, length);
+                        System.arraycopy(oldRoute.getSequence(), 0, combinedSequence2, length, oldRoute.getLength());
+                        Route combinedRoute2 = new Route(this.graph.getData(), oldRoute.getDepot(),
+                                                          combinedSequence2, oldRoute.paysDepotOpening());
+                        if (!endingNode.updateLabel(this.solution, oldRoute, combinedRoute2)) {
+                            combinedRoute2.intraRoutesLocalSearch(this.graph.getData());
+                            endingNode.updateLabel(this.solution, oldRoute, combinedRoute2);
                         }
                     }
                     // Unlike merging, a swap or a shift leaves the two routes on their own
                     // depots and only moves stops between them, so the segment is offered to
                     // every depot that could host it and not just to the one already serving
-                    // old_route. The move itself checks the receiving depot has room.
-                    if (combined_demand <= 2 * this.graph.getData().getCapacity())
+                    // oldRoute. The move itself checks the receiving depot has room.
+                    if (combinedDemand <= 2 * this.graph.getData().getCapacity())
                         for (Route candidate : candidates.values()) {
-                            LocalSearchMove lsm = old_route.getLSM(this.graph.getData(), candidate, this.Solution);
+                            LocalSearchMove lsm = oldRoute.getLSM(this.graph.getData(), candidate, this.solution);
                             if (lsm != null) {
-                                lsm.Perform(this.graph.getData());
-                                EndingNode.UpdateLabel(this.graph.getData(), this.Solution, old_route, lsm.getFirstRoute(), lsm.getSecondRoute());
+                                lsm.perform(this.graph.getData());
+                                endingNode.updateLabel(this.graph.getData(), this.solution, oldRoute, lsm.getFirstRoute(), lsm.getSecondRoute());
                                 break;
                             }
                         }
                 }
-                if (cumulative_demand > this.graph.getData().getCapacity()) {
-                    this.NodeProcessingWith = this.graph.getLength();
-                    this.graph.setNewSetters(EndingNode);
+                if (cumulativeDemand > this.graph.getData().getCapacity()) {
+                    this.nodeProcessingWith = this.graph.getLength();
+                    this.graph.setNewSetters(endingNode);
                     break;
                 }
-                this.NodeProcessingWith++;
-                this.graph.setNewSetters(EndingNode);
+                this.nodeProcessingWith++;
+                this.graph.setNewSetters(endingNode);
             }
 
         } finally {
@@ -172,16 +172,16 @@ public class ArcSetter extends RecursiveAction {
      *         source where there is no partial solution yet
      */
     private int leftOver(Depot depot) {
-        return this.Solution == null ? depot.capacity() : this.Solution.getLeftOver(depot);
+        return this.solution == null ? depot.capacity() : this.solution.getLeftOver(depot);
     }
 
     // The giant tour is compared by reference in equals, so it is hashed by identity to match.
     @Override
     public int hashCode() {
-        int hash = this.StartingNode.NodeIndex;
+        int hash = this.startingNode.nodeIndex;
         if (this.graph.getTours().length > 1)
-            hash = 31 * hash + System.identityHashCode(this.Tour);
-        return this.Solution != null ? 31 * hash + Double.hashCode(this.Solution.getTotalDistance()) : hash;
+            hash = 31 * hash + System.identityHashCode(this.tour);
+        return this.solution != null ? 31 * hash + Double.hashCode(this.solution.getTotalDistance()) : hash;
     }
 
     @Override
@@ -191,10 +191,10 @@ public class ArcSetter extends RecursiveAction {
         if (obj == null || getClass() != obj.getClass())
             return false;
         ArcSetter other = (ArcSetter) obj;
-        if (this.StartingNode.NodeIndex != other.StartingNode.NodeIndex)
+        if (this.startingNode.nodeIndex != other.startingNode.nodeIndex)
             return false;
-        if (this.graph.getTours().length > 1 && this.Tour != other.Tour)
+        if (this.graph.getTours().length > 1 && this.tour != other.tour)
             return false;
-        return this.Solution == null ? other.Solution == null : this.Solution.getTotalDistance() == other.Solution.getTotalDistance() && this.Solution.getRoutesCount() == other.Solution.getRoutesCount();
+        return this.solution == null ? other.solution == null : this.solution.getTotalDistance() == other.solution.getTotalDistance() && this.solution.getRoutesCount() == other.solution.getRoutesCount();
     }
 }

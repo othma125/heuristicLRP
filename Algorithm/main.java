@@ -28,7 +28,7 @@ public class main {
         //try (InputData data = new InputData("Algorithm/LRPLib/Instances_Barreto_LRP/coordGaspelle.dat")) {
         try (InputData data = new InputData("Algorithm/LRPLib/Instances_Prodhon_LRP/coord20-5-1.dat")) {
             GeneticAlgorithm algorithm = new GeneticAlgorithm(data);
-            algorithm.Run();
+            algorithm.run();
 
             if (algorithm.isFeasible()) {
                 GiantTour gt = algorithm.getBestGiantTour();
